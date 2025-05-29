@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Download, RefreshCw } from "lucide-react"
+import IntrusionReports from "@/components/intrusion-reports"
 
 export default function OwnerIntrusionsPage() {
   return (
@@ -27,9 +28,7 @@ export default function OwnerIntrusionsPage() {
           <CardDescription>Detailed intrusion analysis by room and time period</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-10 text-muted-foreground">
-            <p>Room-wise intrusion reports and analytics would be displayed here</p>
-          </div>
+          <IntrusionReports />
         </CardContent>
       </Card>
     </div>

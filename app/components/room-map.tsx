@@ -77,7 +77,7 @@ interface RoomMapProps {
   liveView?: boolean
 }
 
-const RoomMap = ({ liveView = true }: RoomMapProps) => {
+export const RoomMap = ({ liveView = true }: RoomMapProps) => {
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null)
 
   const getStatusColor = (status: Room["status"]) => {
@@ -181,4 +181,5 @@ const RoomMap = ({ liveView = true }: RoomMapProps) => {
   )
 }
 
+// Also export as default for backward compatibility
 export default RoomMap

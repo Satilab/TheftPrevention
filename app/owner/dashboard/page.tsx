@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Users, AlertTriangle, CheckCircle, AlertOctagon, TrendingUp, Eye, Download } from "lucide-react"
 import { DashboardChart } from "@/components/dashboard-chart"
 import { RecentActivity } from "@/components/recent-activity"
+import { AdvancedAnalytics } from "@/components/advanced-analytics"
+import { RealTimeAlerts } from "@/components/real-time-alerts"
 
 export default function OwnerDashboard() {
   return (
@@ -170,9 +172,7 @@ export default function OwnerDashboard() {
               <CardDescription>Detailed security metrics and trends</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-10 text-muted-foreground">
-                <p>Advanced analytics dashboard with charts and detailed metrics would be displayed here</p>
-              </div>
+              <AdvancedAnalytics />
             </CardContent>
           </Card>
         </TabsContent>
@@ -184,9 +184,7 @@ export default function OwnerDashboard() {
               <CardDescription>Live monitoring of security events</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-10 text-muted-foreground">
-                <p>Real-time alert monitoring interface would be displayed here</p>
-              </div>
+              <RealTimeAlerts />
             </CardContent>
           </Card>
         </TabsContent>

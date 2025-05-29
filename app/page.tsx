@@ -12,12 +12,8 @@ export default function HomePage() {
   useEffect(() => {
     if (!isLoading) {
       if (user && role) {
-        // Redirect based on role
-        if (role === "owner") {
-          router.push("/owner/dashboard")
-        } else if (role === "receptionist") {
-          router.push("/receptionist/dashboard")
-        }
+        // Redirect based on role to the dashboard
+        router.push("/dashboard")
       } else {
         // No user, redirect to login
         router.push("/login")

@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Eye, RefreshCw } from "lucide-react"
+import { RefreshCw } from "lucide-react"
 import { useState } from "react"
+import InteractiveRoomMap from "@/components/interactive-room-map"
 
 export default function OwnerRoomMapPage() {
   const [liveView, setLiveView] = useState(true)
@@ -34,10 +35,7 @@ export default function OwnerRoomMapPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-10 text-muted-foreground">
-            <Eye className="mx-auto h-10 w-10 mb-2" />
-            <p>Interactive room map with filters and alert history would be displayed here</p>
-          </div>
+          <InteractiveRoomMap liveView={liveView} />
         </CardContent>
       </Card>
     </div>
