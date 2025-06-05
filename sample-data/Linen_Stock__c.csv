@@ -1,0 +1,16 @@
+Name,Type__c,Room__c,Status__c,Issue_Date__c,Return_Date__c
+Bedsheet Set 1,Bedsheet,,Issued,2024-01-20,
+Towel Set 1,Towel,,Issued,2024-01-20,
+Pillow Cover 1,Pillow Cover,,Returned,2024-01-19,2024-01-20
+Bedsheet Set 2,Bedsheet,,Issued,2024-01-20,
+Towel Set 2,Towel,,Damaged,2024-01-19,
+Pillow Cover 2,Pillow Cover,,Issued,2024-01-20,
+Bedsheet Set 3,Bedsheet,,Returned,2024-01-18,2024-01-20
+Towel Set 3,Towel,,Issued,2024-01-20,
+Pillow Cover 3,Pillow Cover,,Issued,2024-01-20,
+Bedsheet Set 4,Bedsheet,,Issued,2024-01-20,
+Towel Set 4,Towel,,Returned,2024-01-19,2024-01-20
+Pillow Cover 4,Pillow Cover,,Damaged,2024-01-18,
+Bedsheet Set 5,Bedsheet,,Issued,2024-01-20,
+Towel Set 5,Towel,,Issued,2024-01-20,
+Pillow Cover 5,Pillow Cover,,Returned,2024-01-19,2024-01-20

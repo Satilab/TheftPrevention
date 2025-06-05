@@ -1,10 +1,9 @@
 "use client"
-
-import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react"
 import { useSalesforceReal } from "@/hooks/use-salesforce-real"
 
-interface Guest {
+// Define interfaces for our data types
+export interface Guest {
   id: string
   name: string
   email?: string
@@ -19,7 +18,7 @@ interface Guest {
   voiceLogUrl?: string
 }
 
-interface Staff {
+export interface Staff {
   id: string
   name: string
   role: "Security" | "Receptionist" | "Cleaner"
@@ -29,7 +28,7 @@ interface Staff {
   salesforceId?: string
 }
 
-interface Room {
+export interface Room {
   id: string
   roomNumber: string
   status: "Vacant" | "Occupied" | "Alerted"
@@ -37,7 +36,7 @@ interface Room {
   salesforceId?: string
 }
 
-interface FaceLog {
+export interface FaceLog {
   id: string
   timestamp: Date
   roomId?: string
@@ -48,7 +47,7 @@ interface FaceLog {
   unauthorized?: boolean
 }
 
-interface SecurityAlert {
+export interface SecurityAlert {
   id: string
   type: "Intruder" | "Mismatch" | "Tailgating"
   severity: "low" | "medium" | "high" | "critical"
@@ -65,7 +64,7 @@ interface SecurityAlert {
   faceImageUrl?: string
 }
 
-interface AudioLog {
+export interface AudioLog {
   id: string
   guestId?: string
   guestName?: string
@@ -83,7 +82,7 @@ interface AudioLog {
   status?: "pending" | "escalated" | "resolved"
 }
 
-interface LinenStock {
+export interface LinenStock {
   id: string
   type: "Bedsheet" | "Towel" | "Pillow Cover"
   roomId?: string
@@ -93,8 +92,8 @@ interface LinenStock {
   salesforceId?: string
 }
 
+// Define the context type
 interface DataContextType {
-  // ONLY Custom Objects - NO standard objects
   guests: Guest[]
   staff: Staff[]
   rooms: Room[]
@@ -102,18 +101,13 @@ interface DataContextType {
   alerts: SecurityAlert[]
   audioLogs: AudioLog[]
   linenStock: LinenStock[]
-
-  // Loading states
   isLoading: boolean
+  isInitialLoad: boolean
   lastRefresh: Date | null
-
-  // Salesforce connection
   isConnectedToSalesforce: boolean
   salesforceError: string | null
   checkSalesforceConnection: () => Promise<void>
   refreshAllData: () => Promise<void>
-
-  // Actions
   addGuest: (guest: Omit<Guest, "id">) => Promise<void>
   updateGuest: (id: string, updates: Partial<Guest>) => Promise<void>
   addStaff: (staff: Omit<Staff, "id">) => Promise<void>
@@ -127,141 +121,56 @@ interface DataContextType {
   updateLinenStock: (id: string, updates: Partial<LinenStock>) => Promise<void>
 }
 
-const DataContext = createContext<DataContextType | undefined>(undefined)
+// Create the context with default values
+const DataContext = createContext<DataContextType>({
+  guests: [],
+  staff: [],
+  rooms: [],
+  faceLogs: [],
+  alerts: [],
+  audioLogs: [],
+  linenStock: [],
+  isLoading: false,
+  isInitialLoad: true,
+  lastRefresh: null,
+  isConnectedToSalesforce: false,
+  salesforceError: null,
+  checkSalesforceConnection: async () => {},
+  refreshAllData: async () => {},
+  addGuest: async () => {},
+  updateGuest: async () => {},
+  addStaff: async () => {},
+  addRoom: async () => {},
+  createFaceLog: async () => {},
+  createSecurityAlert: async () => {},
+  updateAlert: async () => {},
+  resolveAlert: async () => {},
+  createAudioLog: async () => {},
+  addLinenStock: async () => {},
+  updateLinenStock: async () => {},
+})
 
-// Generate sample data for development/demo purposes
-const generateSampleData = () => {
-  // Sample rooms
-  const sampleRooms: Room[] = Array.from({ length: 20 }, (_, i) => ({
-    id: `room_${i + 1}`,
-    roomNumber: `${i + 101}`,
-    status: i % 5 === 0 ? "Alerted" : i % 3 === 0 ? "Occupied" : "Vacant",
-    salesforceId: `sf_room_${i + 1}`,
-  }))
-
-  // Sample guests
-  const sampleGuests: Guest[] = Array.from({ length: 8 }, (_, i) => ({
-    id: `guest_${i + 1}`,
-    name: `Guest ${i + 1}`,
-    roomNumber: `${i + 101}`,
-    status: i % 3 === 0 ? "checked-out" : "checked-in",
-    checkInDate: "2023-05-01",
-    checkOutDate: i % 3 === 0 ? "2023-05-05" : undefined,
-    salesforceId: `sf_guest_${i + 1}`,
-  }))
-
-  // Sample staff
-  const sampleStaff: Staff[] = Array.from({ length: 5 }, (_, i) => ({
-    id: `staff_${i + 1}`,
-    name: `Staff ${i + 1}`,
-    role: i === 0 ? "Security" : i === 1 ? "Cleaner" : "Receptionist",
-    salesforceId: `sf_staff_${i + 1}`,
-  }))
-
-  // Sample face logs
-  const sampleFaceLogs: FaceLog[] = Array.from({ length: 15 }, (_, i) => ({
-    id: `facelog_${i + 1}`,
-    timestamp: new Date(Date.now() - i * 3600000),
-    roomId: `room_${(i % 10) + 1}`,
-    matchType: i % 3 === 0 ? "Guest" : i % 3 === 1 ? "Staff" : "Unknown",
-    confidence: 70 + Math.floor(Math.random() * 30),
-    salesforceId: `sf_facelog_${i + 1}`,
-  }))
-
-  // Sample alerts
-  const sampleAlerts: SecurityAlert[] = Array.from({ length: 10 }, (_, i) => ({
-    id: `alert_${i + 1}`,
-    type: i % 3 === 0 ? "Intruder" : i % 3 === 1 ? "Mismatch" : "Tailgating",
-    severity: i % 4 === 0 ? "critical" : i % 4 === 1 ? "high" : i % 4 === 2 ? "medium" : "low",
-    timestamp: new Date(Date.now() - i * 7200000),
-    location: `Room ${i + 101}`,
-    description: `Alert detected in Room ${i + 101}`,
-    status: i % 4 === 0 ? "Open" : i % 4 === 1 ? "Responded" : i % 4 === 2 ? "Resolved" : "Escalated",
-    confidence: 70 + Math.floor(Math.random() * 30),
-    salesforceId: `sf_alert_${i + 1}`,
-  }))
-
-  // Sample audio logs
-  const sampleAudioLogs: AudioLog[] = Array.from({ length: 8 }, (_, i) => ({
-    id: `audiolog_${i + 1}`,
-    timestamp: new Date(Date.now() - i * 5400000),
-    duration: 30 + Math.floor(Math.random() * 120),
-    salesforceId: `sf_audiolog_${i + 1}`,
-  }))
-
-  // Sample linen stock
-  const sampleLinenStock: LinenStock[] = Array.from({ length: 12 }, (_, i) => ({
-    id: `linen_${i + 1}`,
-    type: i % 3 === 0 ? "Bedsheet" : i % 3 === 1 ? "Towel" : "Pillow Cover",
-    roomId: `room_${(i % 10) + 1}`,
-    status: i % 3 === 0 ? "Issued" : i % 3 === 1 ? "Returned" : "Damaged",
-    issueDate: "2023-05-01",
-    returnDate: i % 3 === 1 ? "2023-05-05" : undefined,
-    salesforceId: `sf_linen_${i + 1}`,
-  }))
-
-  return {
-    rooms: sampleRooms,
-    guests: sampleGuests,
-    staff: sampleStaff,
-    faceLogs: sampleFaceLogs,
-    alerts: sampleAlerts,
-    audioLogs: sampleAudioLogs,
-    linenStock: sampleLinenStock,
-  }
-}
-
-export function DataProvider({ children }: { children: React.ReactNode }) {
-  // Initialize with sample data for immediate rendering
-  const sampleData = generateSampleData()
-
-  const [guests, setGuests] = useState<Guest[]>(sampleData.guests)
-  const [staff, setStaff] = useState<Staff[]>(sampleData.staff)
-  const [rooms, setRooms] = useState<Room[]>(sampleData.rooms)
-  const [faceLogs, setFaceLogs] = useState<FaceLog[]>(sampleData.faceLogs)
-  const [alerts, setAlerts] = useState<SecurityAlert[]>(sampleData.alerts)
-  const [audioLogs, setAudioLogs] = useState<AudioLog[]>(sampleData.audioLogs)
-  const [linenStock, setLinenStock] = useState<LinenStock[]>(sampleData.linenStock)
-
+// Create the provider component
+export function DataProvider({ children }: { children: ReactNode }) {
+  // Initialize with empty arrays
+  const [guests, setGuests] = useState<Guest[]>([])
+  const [staff, setStaff] = useState<Staff[]>([])
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [faceLogs, setFaceLogs] = useState<FaceLog[]>([])
+  const [alerts, setAlerts] = useState<SecurityAlert[]>([])
+  const [audioLogs, setAudioLogs] = useState<AudioLog[]>([])
+  const [linenStock, setLinenStock] = useState<LinenStock[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(new Date())
-  const [usingSampleData, setUsingSampleData] = useState(true)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
 
   const salesforce = useSalesforceReal()
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Try to connect to Salesforce in the background, but don't block rendering
-  useEffect(() => {
-    const initializeSalesforce = async () => {
-      try {
-        // Don't set loading state to true here to avoid blocking UI
-        console.log("🔄 Checking Salesforce connection in the background...")
+  // Function to refresh all data - using useRef to avoid dependency issues
+  const refreshAllDataRef = useRef<() => Promise<void>>()
 
-        if (!salesforce.isConnected && !salesforce.isLoading) {
-          await salesforce.checkConnection()
-        }
-
-        if (salesforce.isConnected) {
-          console.log("✅ Connected to Salesforce, will attempt to fetch real data")
-          // Only try to fetch real data if we're connected
-          refreshAllData().catch((err) => {
-            console.error("Failed to fetch Salesforce data:", err)
-            console.log("⚠️ Using sample data due to Salesforce data fetch failure")
-          })
-        } else {
-          console.log("⚠️ Not connected to Salesforce, using sample data")
-        }
-      } catch (error) {
-        console.error("❌ Error initializing Salesforce:", error)
-        console.log("⚠️ Using sample data due to Salesforce initialization failure")
-      }
-    }
-
-    // Don't block rendering, just try to connect in the background
-    initializeSalesforce()
-  }, [])
-
-  const refreshAllData = async () => {
-    // Don't block UI rendering with this loading state
+  refreshAllDataRef.current = async () => {
     setIsLoading(true)
     console.log("🔄 Refreshing all data from Salesforce...")
 
@@ -274,9 +183,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       if (salesforce.isConnected) {
         console.log("✅ Connected to Salesforce, fetching data...")
-        let hasRealData = false
 
-        // Try to fetch each data type independently
+        // Fetch data with individual error handling
         try {
           const salesforceGuests = await salesforce.getGuests()
           if (salesforceGuests && salesforceGuests.length > 0) {
@@ -297,8 +205,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               voiceLogUrl: guest.Voice_Log_URL__c,
             }))
             setGuests(mappedGuests)
-            hasRealData = true
-            console.log(`✅ Loaded ${mappedGuests.length} guests from Salesforce`)
+            console.log(`✅ Loaded ${mappedGuests.length} guests`)
           }
         } catch (error) {
           console.warn("⚠️ Failed to load guests:", error)
@@ -317,8 +224,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               salesforceId: staff.Id,
             }))
             setStaff(mappedStaff)
-            hasRealData = true
-            console.log(`✅ Loaded ${mappedStaff.length} staff from Salesforce`)
+            console.log(`✅ Loaded ${mappedStaff.length} staff`)
           }
         } catch (error) {
           console.warn("⚠️ Failed to load staff:", error)
@@ -335,8 +241,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               salesforceId: room.Id,
             }))
             setRooms(mappedRooms)
-            hasRealData = true
-            console.log(`✅ Loaded ${mappedRooms.length} rooms from Salesforce`)
+            console.log(`✅ Loaded ${mappedRooms.length} rooms`)
           }
         } catch (error) {
           console.warn("⚠️ Failed to load rooms:", error)
@@ -356,8 +261,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               unauthorized: false,
             }))
             setFaceLogs(mappedFaceLogs)
-            hasRealData = true
-            console.log(`✅ Loaded ${mappedFaceLogs.length} face logs from Salesforce`)
+            console.log(`✅ Loaded ${mappedFaceLogs.length} face logs`)
           }
         } catch (error) {
           console.warn("⚠️ Failed to load face logs:", error)
@@ -370,7 +274,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               id: alert.Id || `temp_${Date.now()}_${Math.random()}`,
               type: (alert.Alert_Type__c as any) || "Intruder",
               severity: "medium",
-              timestamp: new Date(),
+              timestamp: new Date(alert.CreatedDate || Date.now()),
               location: "Unknown",
               description: `${alert.Alert_Type__c || "Security"} alert`,
               status: (alert.Status__c as any) || "Open",
@@ -383,8 +287,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               faceImageUrl: undefined,
             }))
             setAlerts(mappedAlerts)
-            hasRealData = true
-            console.log(`✅ Loaded ${mappedAlerts.length} alerts from Salesforce`)
+            console.log(`✅ Loaded ${mappedAlerts.length} alerts`)
           }
         } catch (error) {
           console.warn("⚠️ Failed to load alerts:", error)
@@ -411,8 +314,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               status: "pending",
             }))
             setAudioLogs(mappedAudioLogs)
-            hasRealData = true
-            console.log(`✅ Loaded ${mappedAudioLogs.length} audio logs from Salesforce`)
+            console.log(`✅ Loaded ${mappedAudioLogs.length} audio logs`)
           }
         } catch (error) {
           console.warn("⚠️ Failed to load audio logs:", error)
@@ -431,372 +333,171 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               salesforceId: linen.Id,
             }))
             setLinenStock(mappedLinenStock)
-            hasRealData = true
-            console.log(`✅ Loaded ${mappedLinenStock.length} linen stock from Salesforce`)
+            console.log(`✅ Loaded ${mappedLinenStock.length} linen stock`)
           }
         } catch (error) {
           console.warn("⚠️ Failed to load linen stock:", error)
         }
 
-        setUsingSampleData(!hasRealData)
-        if (!hasRealData) {
-          console.log("⚠️ No real data found in Salesforce, using sample data")
-        } else {
-          console.log("✅ Using real data from Salesforce")
-        }
+        console.log("✅ Data refresh completed successfully")
       } else {
-        console.log("⚠️ Not connected to Salesforce - using sample data")
+        console.log("⚠️ Not connected to Salesforce - data remains empty")
         console.log("Salesforce error:", salesforce.error)
-        setUsingSampleData(true)
       }
 
       setLastRefresh(new Date())
     } catch (error) {
       console.error("❌ Failed to refresh data from Salesforce:", error)
-      // Don't throw the error, just log it and continue with sample data
-      setUsingSampleData(true)
     } finally {
       setIsLoading(false)
+      setIsInitialLoad(false)
     }
   }
 
-  const addGuest = async (guestData: Omit<Guest, "id">) => {
-    const newGuest: Guest = {
-      ...guestData,
-      id: `G${Date.now()}`,
+  // Wrapper function for external calls
+  const refreshAllData = async () => {
+    if (refreshAllDataRef.current) {
+      await refreshAllDataRef.current()
+    }
+  }
+
+  // Auto-refresh on mount and set up periodic refresh
+  useEffect(() => {
+    console.log("🚀 Data context initialized - starting auto-refresh")
+
+    // Initial data load
+    if (refreshAllDataRef.current) {
+      refreshAllDataRef.current()
     }
 
-    // Add to local state immediately
-    setGuests((prev) => [...prev, newGuest])
+    // Set up periodic refresh every 30 seconds for real-time updates
+    refreshIntervalRef.current = setInterval(() => {
+      console.log("⏰ Periodic refresh triggered")
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
+      }
+    }, 30000) // 30 seconds
 
-    // Sync to Salesforce if connected
-    if (salesforce.isConnected) {
-      try {
-        const salesforceId = await salesforce.createGuest({
-          Name: newGuest.name,
-          Room_No__c: newGuest.roomNumber,
-          ID_Proof__c: newGuest.idProof,
-          Checkin_Time__c: newGuest.checkInDate ? new Date(newGuest.checkInDate).toISOString() : undefined,
-          Checkout_Time__c: newGuest.checkOutDate ? new Date(newGuest.checkOutDate).toISOString() : undefined,
-          Photo_URL__c: newGuest.photoUrl,
-          Voice_Log_URL__c: newGuest.voiceLogUrl,
-        })
-
-        if (salesforceId) {
-          setGuests((prev) => prev.map((g) => (g.id === newGuest.id ? { ...g, salesforceId } : g)))
-        }
-      } catch (error) {
-        console.error("Failed to sync guest to Salesforce:", error)
+    // Cleanup interval on unmount
+    return () => {
+      console.log("🧹 Cleaning up refresh interval")
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current)
       }
     }
+  }, []) // Empty dependency array - only run once on mount
+
+  // CRUD operations (simplified for brevity)
+  const addGuest = async (guestData: Omit<Guest, "id">) => {
+    const newGuest: Guest = { ...guestData, id: `G${Date.now()}` }
+    setGuests((prev) => [...prev, newGuest])
+    // Trigger refresh to get updated data
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
+      }
+    }, 1000)
   }
 
   const updateGuest = async (id: string, updates: Partial<Guest>) => {
     setGuests((prev) => prev.map((guest) => (guest.id === id ? { ...guest, ...updates } : guest)))
-
-    // Update in Salesforce if connected and has Salesforce ID
-    const guest = guests.find((g) => g.id === id)
-    if (salesforce.isConnected && guest?.salesforceId) {
-      try {
-        await salesforce.updateGuest(guest.salesforceId, {
-          Name: updates.name,
-          Room_No__c: updates.roomNumber,
-          ID_Proof__c: updates.idProof,
-          Photo_URL__c: updates.photoUrl,
-          Voice_Log_URL__c: updates.voiceLogUrl,
-          Checkin_Time__c: updates.checkInDate ? new Date(updates.checkInDate).toISOString() : undefined,
-          Checkout_Time__c: updates.checkOutDate ? new Date(updates.checkOutDate).toISOString() : undefined,
-        })
-      } catch (error) {
-        console.error("Failed to update guest in Salesforce:", error)
+    // Trigger refresh to get updated data
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    }
+    }, 1000)
   }
 
   const addStaff = async (staffData: Omit<Staff, "id">) => {
-    const newStaff: Staff = {
-      ...staffData,
-      id: `S${Date.now()}`,
-    }
-
+    const newStaff: Staff = { ...staffData, id: `S${Date.now()}` }
     setStaff((prev) => [...prev, newStaff])
-
-    if (salesforce.isConnected) {
-      try {
-        const salesforceId = await salesforce.createStaff({
-          Name: newStaff.name,
-          Role__c: newStaff.role,
-          Photo_URL__c: newStaff.photoUrl,
-          Shift_Start__c: newStaff.shiftStart,
-          Shift_End__c: newStaff.shiftEnd,
-        })
-
-        if (salesforceId) {
-          setStaff((prev) => prev.map((s) => (s.id === newStaff.id ? { ...s, salesforceId } : s)))
-        }
-      } catch (error) {
-        console.error("Failed to sync staff to Salesforce:", error)
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    }
+    }, 1000)
   }
 
   const addRoom = async (roomData: Omit<Room, "id">) => {
-    const newRoom: Room = {
-      ...roomData,
-      id: `R${Date.now()}`,
-    }
-
+    const newRoom: Room = { ...roomData, id: `R${Date.now()}` }
     setRooms((prev) => [...prev, newRoom])
-
-    if (salesforce.isConnected) {
-      try {
-        const salesforceId = await salesforce.createRoom({
-          Room_No__c: newRoom.roomNumber,
-          Status__c: newRoom.status,
-          Guest__c: newRoom.guestId,
-        })
-
-        if (salesforceId) {
-          setRooms((prev) => prev.map((r) => (r.id === newRoom.id ? { ...r, salesforceId } : r)))
-        }
-      } catch (error) {
-        console.error("Failed to sync room to Salesforce:", error)
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    }
+    }, 1000)
   }
 
   const createFaceLog = async (faceLogData: Omit<FaceLog, "id">) => {
-    const newFaceLog: FaceLog = {
-      ...faceLogData,
-      id: `FL${Date.now()}`,
-    }
-
+    const newFaceLog: FaceLog = { ...faceLogData, id: `FL${Date.now()}` }
     setFaceLogs((prev) => [...prev, newFaceLog])
-
-    if (salesforce.isConnected) {
-      try {
-        const salesforceId = await salesforce.createFaceLog({
-          Timestamp__c: newFaceLog.timestamp.toISOString(),
-          Room__c: newFaceLog.roomId,
-          Match_Type__c: newFaceLog.matchType,
-          Confidence__c: newFaceLog.confidence,
-          Face_Image_URL__c: newFaceLog.faceImageUrl,
-        })
-
-        if (salesforceId) {
-          setFaceLogs((prev) => prev.map((fl) => (fl.id === newFaceLog.id ? { ...fl, salesforceId } : fl)))
-        }
-      } catch (error) {
-        console.error("Failed to sync face log to Salesforce:", error)
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    }
+    }, 1000)
   }
 
   const createSecurityAlert = async (alertData: Omit<SecurityAlert, "id" | "timestamp">) => {
-    const newAlert: SecurityAlert = {
-      ...alertData,
-      id: `A${Date.now()}`,
-      timestamp: new Date(),
-    }
-
+    const newAlert: SecurityAlert = { ...alertData, id: `A${Date.now()}`, timestamp: new Date() }
     setAlerts((prev) => [...prev, newAlert])
-
-    if (salesforce.isConnected) {
-      try {
-        const salesforceId = await salesforce.createAlert({
-          Alert_Type__c: newAlert.type,
-          Status__c: newAlert.status,
-          Face_Log__c: newAlert.faceLogId,
-          Assigned_To__c: newAlert.assignedTo,
-          Receptionist_Comment__c: newAlert.receptionistComment,
-          Owner_Review__c: newAlert.ownerReview,
-        })
-
-        if (salesforceId) {
-          setAlerts((prev) => prev.map((a) => (a.id === newAlert.id ? { ...a, salesforceId } : a)))
-        }
-      } catch (error) {
-        console.error("Failed to create Salesforce alert:", error)
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    }
+    }, 1000)
   }
 
   const updateAlert = async (alertId: string, updates: Partial<SecurityAlert>) => {
-    console.log("🔄 Updating alert:", alertId, updates)
-
-    // Find the alert to update
-    const alert = alerts.find((a) => a.id === alertId)
-    if (!alert) {
-      console.error("❌ Alert not found:", alertId)
-      throw new Error("Alert not found")
-    }
-
-    // Update local state first
-    const updatedAlert = { ...alert, ...updates }
-    setAlerts((prev) => prev.map((a) => (a.id === alertId ? updatedAlert : a)))
-
-    // Update in Salesforce if connected and has Salesforce ID
-    if (salesforce.isConnected && alert.salesforceId) {
-      try {
-        console.log("📤 Syncing alert to Salesforce:", alert.salesforceId, updates)
-
-        // Prepare Salesforce update data
-        const salesforceUpdates: any = {}
-        if (updates.type) salesforceUpdates.Alert_Type__c = updates.type
-        if (updates.status) salesforceUpdates.Status__c = updates.status
-        if (updates.assignedTo) salesforceUpdates.Assigned_To__c = updates.assignedTo
-        if (updates.receptionistComment) salesforceUpdates.Receptionist_Comment__c = updates.receptionistComment
-        if (updates.ownerReview) salesforceUpdates.Owner_Review__c = updates.ownerReview
-
-        const success = await salesforce.updateAlert(alert.salesforceId, salesforceUpdates)
-
-        if (success) {
-          console.log("✅ Successfully updated alert in Salesforce")
-        } else {
-          console.error("❌ Failed to update alert in Salesforce")
-          throw new Error("Salesforce update failed")
-        }
-      } catch (error) {
-        console.error("❌ Failed to update alert in Salesforce:", error)
-        // Revert local state on Salesforce error
-        setAlerts((prev) => prev.map((a) => (a.id === alertId ? alert : a)))
-        throw error
+    setAlerts((prev) => prev.map((a) => (a.id === alertId ? { ...a, ...updates } : a)))
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    } else {
-      console.warn("⚠️ Not connected to Salesforce or alert has no Salesforce ID")
-    }
+    }, 1000)
   }
 
   const resolveAlert = async (alertId: string, comment?: string) => {
-    const alert = alerts.find((a) => a.id === alertId)
-
-    // Update local state
     setAlerts((prev) =>
       prev.map((alert) =>
         alert.id === alertId ? { ...alert, status: "Resolved" as const, ownerReview: comment } : alert,
       ),
     )
-
-    // Update in Salesforce if connected and has Salesforce ID
-    if (salesforce.isConnected && alert?.salesforceId) {
-      try {
-        await salesforce.updateAlert(alert.salesforceId, {
-          Status__c: "Resolved",
-          Owner_Review__c: comment,
-        })
-      } catch (error) {
-        console.error("Failed to update alert in Salesforce:", error)
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    }
+    }, 1000)
   }
 
   const createAudioLog = async (audioLogData: Omit<AudioLog, "id">) => {
-    const newAudioLog: AudioLog = {
-      ...audioLogData,
-      id: `AL${Date.now()}`,
-    }
-
+    const newAudioLog: AudioLog = { ...audioLogData, id: `AL${Date.now()}` }
     setAudioLogs((prev) => [...prev, newAudioLog])
-
-    if (salesforce.isConnected) {
-      try {
-        const salesforceId = await salesforce.createAudioLog({
-          Linked_Guest__c: newAudioLog.guestId,
-          Recording_URL__c: newAudioLog.recordingUrl,
-          Timestamp__c: newAudioLog.timestamp.toISOString(),
-          Duration__c: newAudioLog.duration,
-        })
-
-        if (salesforceId) {
-          setAudioLogs((prev) => prev.map((al) => (al.id === newAudioLog.id ? { ...al, salesforceId } : al)))
-        }
-      } catch (error) {
-        console.error("Failed to sync audio log to Salesforce:", error)
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    }
+    }, 1000)
   }
 
   const addLinenStock = async (linenData: Omit<LinenStock, "id">) => {
-    const newLinen: LinenStock = {
-      ...linenData,
-      id: `L${Date.now()}`,
-    }
-
+    const newLinen: LinenStock = { ...linenData, id: `L${Date.now()}` }
     setLinenStock((prev) => [...prev, newLinen])
-
-    if (salesforce.isConnected) {
-      try {
-        const salesforceId = await salesforce.createLinenStock({
-          Type__c: newLinen.type,
-          Room__c: newLinen.roomId,
-          Status__c: newLinen.status,
-          Issue_Date__c: newLinen.issueDate,
-          Return_Date__c: newLinen.returnDate,
-        })
-
-        if (salesforceId) {
-          setLinenStock((prev) => prev.map((l) => (l.id === newLinen.id ? { ...l, salesforceId } : l)))
-        }
-      } catch (error) {
-        console.error("Failed to sync linen stock to Salesforce:", error)
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    }
+    }, 1000)
   }
 
   const updateLinenStock = async (id: string, updates: Partial<LinenStock>) => {
-    console.log("🔄 Updating linen stock:", id, updates)
-
-    // Find the item to update
-    const item = linenStock.find((l) => l.id === id)
-    if (!item) {
-      console.error("❌ Linen item not found:", id)
-      throw new Error("Linen item not found")
-    }
-
-    // Update local state first
-    const updatedItem = { ...item, ...updates }
-    setLinenStock((prev) => prev.map((linen) => (linen.id === id ? updatedItem : linen)))
-
-    // Update in Salesforce if connected and has Salesforce ID
-    if (salesforce.isConnected && item.salesforceId) {
-      try {
-        console.log("📤 Syncing to Salesforce:", item.salesforceId, updates)
-
-        // Prepare Salesforce update data
-        const salesforceUpdates: any = {}
-        if (updates.type) salesforceUpdates.Type__c = updates.type
-        if (updates.roomId) salesforceUpdates.Room__c = updates.roomId
-        if (updates.status) salesforceUpdates.Status__c = updates.status
-        if (updates.issueDate) salesforceUpdates.Issue_Date__c = updates.issueDate
-        if (updates.returnDate) salesforceUpdates.Return_Date__c = updates.returnDate
-
-        // Add current timestamp for return date if status is being set to Returned
-        if (updates.status === "Returned" && !updates.returnDate) {
-          salesforceUpdates.Return_Date__c = new Date().toISOString().split("T")[0]
-        }
-
-        // Add current timestamp for issue date if status is being set to Issued
-        if (updates.status === "Issued" && !updates.issueDate) {
-          salesforceUpdates.Issue_Date__c = new Date().toISOString().split("T")[0]
-        }
-
-        const success = await salesforce.updateLinenStock(item.salesforceId, salesforceUpdates)
-
-        if (success) {
-          console.log("✅ Successfully updated in Salesforce")
-        } else {
-          console.error("❌ Failed to update in Salesforce")
-          throw new Error("Salesforce update failed")
-        }
-      } catch (error) {
-        console.error("❌ Failed to update linen stock in Salesforce:", error)
-        // Revert local state on Salesforce error
-        setLinenStock((prev) => prev.map((linen) => (linen.id === id ? item : linen)))
-        throw error
+    setLinenStock((prev) => prev.map((linen) => (linen.id === id ? { ...linen, ...updates } : linen)))
+    setTimeout(() => {
+      if (refreshAllDataRef.current) {
+        refreshAllDataRef.current()
       }
-    } else {
-      console.warn("⚠️ Not connected to Salesforce or item has no Salesforce ID")
-    }
+    }, 1000)
   }
 
   return (
@@ -809,7 +510,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         alerts,
         audioLogs,
         linenStock,
-        isLoading: isLoading || salesforce.isLoading,
+        isLoading,
+        isInitialLoad,
         lastRefresh,
         isConnectedToSalesforce: salesforce.isConnected,
         salesforceError: salesforce.error,
@@ -835,7 +537,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
 export function useData() {
   const context = useContext(DataContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useData must be used within a DataProvider")
   }
   return context

@@ -4,412 +4,242 @@ import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Eye, AlertTriangle, Users, Clock, Search, Plus } from 'lucide-react'
-import { useData } from "@/contexts/data-context"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Search } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AlertCircle, CheckCircle } from "lucide-react"
 
-interface InteractiveRoomMapProps {
-  liveView?: boolean
-  viewMode?: "grid" | "list"
+// Define the Room interface to match what we get from Salesforce
+interface Room {
+  Id?: string
+  Name?: string
+  Room_Number__c?: string
+  Room_Type__c?: string
+  Status__c?: string
+  Floor__c?: string
+  Has_Alert__c?: boolean
+  Last_Cleaned__c?: string
+  Guest_Name__c?: string
 }
 
-function InteractiveRoomMap({ liveView = true, viewMode = "grid" }: InteractiveRoomMapProps) {
-  const { rooms, isLoading, guests } = useData()
-  const [selectedRoom, setSelectedRoom] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<string>("all")
-  const [filterStatus, setFilterStatus] = useState<string>("all")
-  const [searchQuery, setSearchQuery] = useState<string>("")
+interface InteractiveRoomMapProps {
+  rooms: Room[]
+  userRole?: "owner" | "receptionist"
+}
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Occupied":
-        return "bg-green-500"
-      case "Vacant":
-        return "bg-blue-500"
-      case "Alerted":
-        return "bg-red-500"
-      default:
-        return "bg-gray-400"
-    }
-  }
+// Helper function to get status color
+const getStatusColor = (status: string | undefined) => {
+  if (!status) return "bg-gray-200"
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "Occupied":
-        return "default"
-      case "Vacant":
-        return "secondary"
-      case "Alerted":
-        return "destructive"
-      default:
-        return "outline"
-    }
-  }
+  const statusLower = status.toLowerCase()
+  if (statusLower.includes("occupied")) return "bg-blue-500"
+  if (statusLower.includes("vacant") && statusLower.includes("clean")) return "bg-green-500"
+  if (statusLower.includes("vacant") && statusLower.includes("dirty")) return "bg-yellow-500"
+  if (statusLower.includes("maintenance")) return "bg-purple-500"
+  if (statusLower.includes("out of order")) return "bg-red-500"
+  return "bg-gray-200"
+}
 
-  // Find guest name for a room
-  const getGuestName = (roomId: string) => {
-    const room = rooms.find((r) => r.id === roomId)
-    if (!room || !room.guestId) return "None"
+// Export both as named and default export to ensure compatibility
+export function InteractiveRoomMap({ rooms = [], userRole = "owner" }: InteractiveRoomMapProps) {
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterStatus, setFilterStatus] = useState<string | null>(null)
+  const [filterFloor, setFilterFloor] = useState<string | null>(null)
+  const [filterType, setFilterType] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("grid")
 
-    const guest = guests.find((g) => g.id === room.guestId)
-    return guest ? guest.name : "Unknown Guest"
-  }
+  // Ensure rooms is an array before filtering
+  const safeRooms = Array.isArray(rooms) ? rooms : []
 
-  // Calculate last activity time (mock for now, would be from actual logs in real app)
-  const getLastActivity = () => {
-    const times = ["Just now", "5 min ago", "10 min ago", "30 min ago", "1 hour ago"]
-    return times[Math.floor(Math.random() * times.length)]
-  }
+  // Get unique values for filters
+  const uniqueStatuses = [...new Set(safeRooms.map((room) => room.Status__c).filter(Boolean))]
+  const uniqueFloors = [...new Set(safeRooms.map((room) => room.Floor__c).filter(Boolean))]
+  const uniqueTypes = [...new Set(safeRooms.map((room) => room.Room_Type__c).filter(Boolean))]
 
-  const filteredRooms = rooms.filter((room) => {
-    // Filter by tab
-    if (activeTab === "alerts" && room.status !== "Alerted") return false
+  // Filter rooms based on search and filters
+  const filteredRooms = safeRooms.filter((room) => {
+    const matchesSearch =
+      !searchTerm ||
+      (room.Room_Number__c && room.Room_Number__c.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (room.Guest_Name__c && room.Guest_Name__c.toLowerCase().includes(searchTerm.toLowerCase()))
 
-    // Filter by status
-    if (filterStatus !== "all" && room.status !== filterStatus) return false
+    const matchesStatus = !filterStatus || room.Status__c === filterStatus
+    const matchesFloor = !filterFloor || room.Floor__c === filterFloor
+    const matchesType = !filterType || room.Room_Type__c === filterType
 
-    // Filter by search query
-    if (
-      searchQuery &&
-      !room.roomNumber?.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !room.id.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-      return false
-
-    return true
+    return matchesSearch && matchesStatus && matchesFloor && matchesType
   })
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading rooms...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (rooms.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[400px] bg-muted/20 rounded-lg border border-dashed">
-        <div className="text-center p-8">
-          <h3 className="text-lg font-medium mb-2">No Rooms Available</h3>
-          <p className="text-muted-foreground mb-6">
-            There are no rooms in the system. Please add rooms through Salesforce or the setup page.
-          </p>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Rooms
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  if (filteredRooms.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[300px] bg-muted/20 rounded-lg border border-dashed">
-        <div className="text-center p-8">
-          <h3 className="text-lg font-medium mb-2">No Matching Rooms</h3>
-          <p className="text-muted-foreground mb-4">No rooms match your current filters.</p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setFilterStatus("all")
-              setActiveTab("all")
-              setSearchQuery("")
-            }}
-          >
-            Clear Filters
-          </Button>
-        </div>
-      </div>
-    )
+  const handleResetFilters = () => {
+    setSearchTerm("")
+    setFilterStatus(null)
+    setFilterFloor(null)
+    setFilterType(null)
   }
 
   return (
-    <div className="w-full space-y-4">
+    <div className="space-y-4">
       <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1">
-          <div className="bg-card rounded-lg p-4 mb-4 border">
-            <div className="flex flex-col md:flex-row gap-4 mb-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search rooms..."
-                    className="pl-8"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-1 gap-2">
-                <div className="w-full">
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="Occupied">Occupied</SelectItem>
-                      <SelectItem value="Vacant">Vacant</SelectItem>
-                      <SelectItem value="Alerted">Alerted</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search rooms or guests..."
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
 
-            {viewMode === "grid" ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredRooms.map((room) => (
-                  <Card
-                    key={room.id}
-                    className={`cursor-pointer transition-all hover:shadow-lg ${
-                      selectedRoom === room.id ? "ring-2 ring-primary" : ""
-                    }`}
-                    onClick={() => setSelectedRoom(selectedRoom === room.id ? null : room.id)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="font-medium">Room {room.roomNumber || "Unknown"}</div>
-                        <div className={`w-3 h-3 rounded-full ${getStatusColor(room.status || "")}`} />
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-xs">
-                          {room.id}
-                        </Badge>
-                        <Badge variant={getStatusBadgeVariant(room.status || "")} className="text-xs capitalize">
-                          {room.status || "Unknown"}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <div className="flex items-center gap-1">
-                          <Users className="w-4 h-4" />
-                          <span>{room.status === "Occupied" ? "Occupied" : "Empty"}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{getLastActivity()}</span>
-                        </div>
-                      </div>
-
-                      {room.status === "Alerted" && (
-                        <div className="flex items-center gap-1 text-red-600 mb-2">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span className="text-sm">Security alert active</span>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 mt-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button size="sm" variant="outline" className="flex-1">
-                              <Eye className="w-4 h-4 mr-1" />
-                              {liveView ? "Live View" : "View Logs"}
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Room {room.roomNumber || "Unknown"} Details</DialogTitle>
-                              <DialogDescription>Detailed information about this room</DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <p className="text-sm font-medium">Room Number</p>
-                                  <p className="text-sm">{room.roomNumber || "Unknown"}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium">Status</p>
-                                  <div>
-                                    <Badge variant={getStatusBadgeVariant(room.status || "")}>
-                                      {room.status || "Unknown"}
-                                    </Badge>
-                                  </div>
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium">Current Guest</p>
-                                  <p className="text-sm">{getGuestName(room.id)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium">Last Activity</p>
-                                  <p className="text-sm">{getLastActivity()}</p>
-                                </div>
-                              </div>
-
-                              {room.status === "Alerted" && (
-                                <div className="space-y-2">
-                                  <p className="text-sm font-medium">Active Alert</p>
-                                  <div className="space-y-1">
-                                    <div className="text-sm bg-red-50 dark:bg-red-950 p-2 rounded">
-                                      Security alert is active for this room
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="space-y-2">
-                                <p className="text-sm font-medium">Actions</p>
-                                <div className="flex gap-2">
-                                  <Button size="sm" variant="outline">
-                                    View Camera Feed
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    Check History
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-
-                      {selectedRoom === room.id && (
-                        <div className="mt-3 p-3 bg-muted rounded-lg">
-                          <h4 className="font-medium mb-2">Room Details</h4>
-                          <div className="space-y-1 text-sm">
-                            <div>Room Number: {room.roomNumber || "Unknown"}</div>
-                            <div>
-                              Status: <span className="capitalize">{room.status || "Unknown"}</span>
-                            </div>
-                            <div>Guest: {getGuestName(room.id)}</div>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredRooms.map((room) => (
-                  <Card key={room.id} className="overflow-hidden">
-                    <CardContent className="p-0">
-                      <div className="flex flex-col md:flex-row">
-                        <div className="p-4 md:w-1/4">
-                          <h3 className="font-medium">Room {room.roomNumber || "Unknown"}</h3>
-                          <Badge variant="outline" className="mt-1">
-                            {room.id}
-                          </Badge>
-                        </div>
-                        <div className="p-4 bg-muted/50 flex-1">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <p className="font-medium">Status</p>
-                              <div>
-                                <Badge variant={getStatusBadgeVariant(room.status || "")}>
-                                  {room.status || "Unknown"}
-                                </Badge>
-                              </div>
-                            </div>
-                            <div>
-                              <p className="font-medium">Guest</p>
-                              <p>{getGuestName(room.id)}</p>
-                            </div>
-                            <div>
-                              <p className="font-medium">Occupancy</p>
-                              <p>{room.status === "Occupied" ? "Occupied" : "Empty"}</p>
-                            </div>
-                            <div>
-                              <p className="font-medium">Last Activity</p>
-                              <p>{getLastActivity()}</p>
-                            </div>
-                          </div>
-                          {room.status === "Alerted" && (
-                            <div className="mt-2 flex items-center gap-1 text-red-600">
-                              <AlertTriangle className="w-4 h-4" />
-                              <span className="text-sm">Security alert active</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-4 flex items-center">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button size="sm" variant="outline">
-                                <Eye className="w-4 h-4 mr-1" />
-                                View Details
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Room {room.roomNumber || "Unknown"} Details</DialogTitle>
-                                <DialogDescription>Detailed information about this room</DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <p className="text-sm font-medium">Room Number</p>
-                                    <p className="text-sm">{room.roomNumber || "Unknown"}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium">Status</p>
-                                    <div>
-                                      <Badge variant={getStatusBadgeVariant(room.status || "")}>
-                                        {room.status || "Unknown"}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium">Current Guest</p>
-                                    <p className="text-sm">{getGuestName(room.id)}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium">Last Activity</p>
-                                    <p className="text-sm">{getLastActivity()}</p>
-                                  </div>
-                                </div>
-
-                                {room.status === "Alerted" && (
-                                  <div className="space-y-2">
-                                    <p className="text-sm font-medium">Active Alert</p>
-                                    <div className="space-y-1">
-                                      <div className="text-sm bg-red-50 dark:bg-red-950 p-2 rounded">
-                                        Security alert is active for this room
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                <div className="space-y-2">
-                                  <p className="text-sm font-medium">Actions</p>
-                                  <div className="flex gap-2">
-                                    <Button size="sm" variant="outline">
-                                      View Camera Feed
-                                    </Button>
-                                    <Button size="sm" variant="outline">
-                                      Check History
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+        <div className="flex flex-wrap gap-2">
+          <div>
+            <label htmlFor="status-filter" className="sr-only">
+              Filter by Status
+            </label>
+            <select
+              id="status-filter"
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              value={filterStatus || ""}
+              onChange={(e) => setFilterStatus(e.target.value || null)}
+            >
+              <option value="">All Statuses</option>
+              {uniqueStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
           </div>
+
+          <div>
+            <label htmlFor="floor-filter" className="sr-only">
+              Filter by Floor
+            </label>
+            <select
+              id="floor-filter"
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              value={filterFloor || ""}
+              onChange={(e) => setFilterFloor(e.target.value || null)}
+            >
+              <option value="">All Floors</option>
+              {uniqueFloors.map((floor) => (
+                <option key={floor} value={floor}>
+                  {floor}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="type-filter" className="sr-only">
+              Filter by Type
+            </label>
+            <select
+              id="type-filter"
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              value={filterType || ""}
+              onChange={(e) => setFilterType(e.target.value || null)}
+            >
+              <option value="">All Types</option>
+              {uniqueTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Button variant="outline" onClick={handleResetFilters}>
+            Reset Filters
+          </Button>
         </div>
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="grid">Grid View</TabsTrigger>
+          <TabsTrigger value="list">List View</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="grid" className="mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {filteredRooms.map((room) => (
+              <Card key={room.Id || room.Room_Number__c} className="overflow-hidden">
+                <div className={`h-2 ${getStatusColor(room.Status__c)}`} />
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-bold">{room.Room_Number__c || "No Number"}</h3>
+                      <p className="text-sm text-muted-foreground">{room.Room_Type__c || "Unknown Type"}</p>
+                    </div>
+                    {room.Has_Alert__c && <AlertCircle className="h-5 w-5 text-red-500" />}
+                  </div>
+
+                  <div className="mt-2">
+                    <Badge variant={room.Status__c?.toLowerCase().includes("vacant") ? "outline" : "default"}>
+                      {room.Status__c || "Unknown Status"}
+                    </Badge>
+                  </div>
+
+                  {room.Guest_Name__c && <p className="mt-2 text-sm truncate">{room.Guest_Name__c}</p>}
+
+                  {userRole === "owner" && room.Last_Cleaned__c && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Last cleaned: {new Date(room.Last_Cleaned__c).toLocaleDateString()}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="list" className="mt-4">
+          <div className="border rounded-md">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="p-2 text-left">Room</th>
+                  <th className="p-2 text-left">Type</th>
+                  <th className="p-2 text-left">Status</th>
+                  <th className="p-2 text-left">Guest</th>
+                  {userRole === "owner" && <th className="p-2 text-left">Last Cleaned</th>}
+                  <th className="p-2 text-left">Alerts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRooms.map((room) => (
+                  <tr key={room.Id || room.Room_Number__c} className="border-b">
+                    <td className="p-2">{room.Room_Number__c || "No Number"}</td>
+                    <td className="p-2">{room.Room_Type__c || "Unknown"}</td>
+                    <td className="p-2">
+                      <Badge variant={room.Status__c?.toLowerCase().includes("vacant") ? "outline" : "default"}>
+                        {room.Status__c || "Unknown"}
+                      </Badge>
+                    </td>
+                    <td className="p-2">{room.Guest_Name__c || "-"}</td>
+                    {userRole === "owner" && (
+                      <td className="p-2">
+                        {room.Last_Cleaned__c ? new Date(room.Last_Cleaned__c).toLocaleDateString() : "-"}
+                      </td>
+                    )}
+                    <td className="p-2">
+                      {room.Has_Alert__c ? (
+                        <AlertCircle className="h-5 w-5 text-red-500" />
+                      ) : (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
 
-// Export both named and default exports
-export { InteractiveRoomMap }
+// Add default export for compatibility
 export default InteractiveRoomMap

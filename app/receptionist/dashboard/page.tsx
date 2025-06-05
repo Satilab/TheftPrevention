@@ -1,11 +1,12 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, LogOut, AlertTriangle, CheckCircle } from "lucide-react"
+import { Users, LogOut, AlertTriangle, CheckCircle, Wifi, WifiOff } from "lucide-react"
 import { useData } from "@/contexts/data-context"
+import { Badge } from "@/components/ui/badge"
 
 export default function ReceptionistDashboard() {
-  const { guests, alerts, isLoading } = useData()
+  const { guests, alerts, isLoading, isInitialLoad, lastRefresh, isConnectedToSalesforce } = useData()
 
   // Calculate metrics from actual data
   const todayGuests = guests.filter((g) => g.status === "checked-in").length
@@ -15,12 +16,13 @@ export default function ReceptionistDashboard() {
   const activeAlerts = alerts.filter((a) => a.status === "Open").length
   const myTasks = alerts.filter((a) => a.assignedTo === "Current User" && a.status === "acknowledged").length
 
-  if (isLoading) {
+  if (isInitialLoad) {
     return (
       <div className="flex items-center justify-center h-[500px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading dashboard data...</p>
+          <h3 className="text-lg font-medium">Loading Dashboard</h3>
+          <p className="text-muted-foreground">Connecting to Salesforce and loading real-time data...</p>
         </div>
       </div>
     )
@@ -28,6 +30,28 @@ export default function ReceptionistDashboard() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Receptionist Dashboard</h1>
+          <p className="text-muted-foreground">Monitor guest activities and security alerts in real-time</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant={isConnectedToSalesforce ? "default" : "destructive"} className="flex items-center gap-1">
+            {isConnectedToSalesforce ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+            {isConnectedToSalesforce ? "Live Data" : "Offline"}
+          </Badge>
+          {lastRefresh && (
+            <span className="text-xs text-muted-foreground">Last updated: {lastRefresh.toLocaleTimeString()}</span>
+          )}
+          {isLoading && !isInitialLoad && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="animate-spin rounded-full h-3 w-3 border-b border-primary"></div>
+              Syncing...
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

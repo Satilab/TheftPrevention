@@ -1,161 +1,128 @@
 "use client"
 
 import { useData } from "@/contexts/data-context"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, CheckCircle, Clock, RefreshCw } from "lucide-react"
+import { AlertTriangle, CheckCircle, Clock, ArrowUpRight } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export function RealTimeAlerts() {
-  const { alerts, isLoading, refreshAllData } = useData()
+  const { alerts = [], isLoading = false, resolveAlert } = useData() || {}
+  const { toast } = useToast()
 
-  // Filter for recent alerts (last 24 hours)
-  const recentAlerts = alerts.filter((alert) => {
-    const alertTime = new Date(alert.timestamp)
-    const now = new Date()
-    const timeDiff = now.getTime() - alertTime.getTime()
-    const hoursDiff = timeDiff / (1000 * 60 * 60)
-    return hoursDiff <= 24
-  })
+  // Get the most recent alerts
+  const recentAlerts = Array.isArray(alerts)
+    ? alerts
+        .filter((alert) => alert && alert.timestamp)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 5)
+    : []
 
-  const getAlertPriority = (alert: any) => {
-    if (alert.type === "Intruder") return "high"
-    if (alert.type === "Mismatch") return "medium"
-    return "low"
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "border-red-500 bg-red-50 dark:bg-red-950"
-      case "medium":
-        return "border-amber-500 bg-amber-50 dark:bg-amber-950"
-      default:
-        return "border-blue-500 bg-blue-50 dark:bg-blue-950"
+  const handleResolveAlert = async (alertId: string) => {
+    try {
+      await resolveAlert(alertId, "Resolved by owner")
+      toast({
+        title: "Alert Resolved",
+        description: "The alert has been marked as resolved.",
+      })
+    } catch (error) {
+      toast({
+        title: "Failed to Resolve",
+        description: "Could not resolve the alert. Please try again.",
+        variant: "destructive",
+      })
     }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Open":
-        return <AlertTriangle className="h-4 w-4 text-red-500" />
-      case "Resolved":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      default:
-        return <Clock className="h-4 w-4 text-amber-500" />
-    }
-  }
-
-  const formatTimestamp = (timestamp: Date) => {
-    const now = new Date()
-    const diff = now.getTime() - timestamp.getTime()
-    const minutes = Math.floor(diff / (1000 * 60))
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-
-    if (minutes < 1) return "Just now"
-    if (minutes < 60) return `${minutes} min ago`
-    return `${hours} hours ago`
   }
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium">Real-time Alerts</h3>
-          <Button variant="outline" size="sm" disabled>
-            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            Loading...
-          </Button>
-        </div>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardContent className="p-4">
-              <div className="space-y-2">
-                <div className="h-4 bg-muted rounded w-3/4"></div>
-                <div className="h-3 bg-muted rounded w-1/2"></div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex justify-center items-center h-[300px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Real-time Alerts (Last 24h)</h3>
-        <Button variant="outline" size="sm" onClick={refreshAllData}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
+  if (!recentAlerts || recentAlerts.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Real-time Alerts</CardTitle>
+          <CardDescription>No active alerts at this time</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center h-[200px] text-center">
+            <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+            <p className="text-lg font-medium">All Clear</p>
+            <p className="text-sm text-muted-foreground">No security alerts detected</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
-      {recentAlerts.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No Recent Alerts</h3>
-            <p className="text-muted-foreground">
-              No security alerts in the last 24 hours. All systems are operating normally.
-            </p>
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {recentAlerts.map((alert) => (
+        <Card key={alert.id} className="overflow-hidden">
+          <div
+            className={`h-1 ${
+              alert.severity === "critical"
+                ? "bg-red-500"
+                : alert.severity === "high"
+                  ? "bg-orange-500"
+                  : alert.severity === "medium"
+                    ? "bg-yellow-500"
+                    : "bg-blue-500"
+            }`}
+          />
+          <CardHeader className="pb-2">
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className="text-lg flex items-center">
+                  <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
+                  {alert.type} Alert
+                </CardTitle>
+                <CardDescription>{alert.location}</CardDescription>
+              </div>
+              <Badge
+                variant={
+                  alert.status === "Resolved"
+                    ? "outline"
+                    : alert.status === "Open"
+                      ? "destructive"
+                      : alert.status === "Escalated"
+                        ? "default"
+                        : "secondary"
+                }
+              >
+                {alert.status}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm">{alert.description}</p>
+              <div className="text-xs text-muted-foreground flex items-center">
+                <Clock className="h-3 w-3 mr-1" />
+                {new Date(alert.timestamp).toLocaleString()}
+              </div>
+              {alert.status !== "Resolved" && (
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => handleResolveAlert(alert.id)}>
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Resolve
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1">
+                    <ArrowUpRight className="h-4 w-4 mr-1" />
+                    Details
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-3">
-          {recentAlerts.slice(0, 5).map((alert) => {
-            const priority = getAlertPriority(alert)
-            return (
-              <Card key={alert.id} className={`border-l-4 ${getPriorityColor(priority)}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      {getStatusIcon(alert.status)}
-                      <div>
-                        <p className="font-medium text-sm">{alert.type} Alert</p>
-                        <p className="text-xs text-muted-foreground">{alert.location}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge
-                        variant={
-                          alert.status === "Open"
-                            ? "destructive"
-                            : alert.status === "Resolved"
-                              ? "default"
-                              : "secondary"
-                        }
-                      >
-                        {alert.status}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">{formatTimestamp(alert.timestamp)}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm mt-2">{alert.description}</p>
-                  {alert.confidence && (
-                    <div className="mt-2">
-                      <span className="text-xs text-muted-foreground">Confidence: {alert.confidence}%</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
-
-          {recentAlerts.length > 5 && (
-            <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  +{recentAlerts.length - 5} more alerts in the last 24 hours
-                </p>
-                <Button variant="outline" size="sm" className="mt-2">
-                  View All Alerts
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+      ))}
     </div>
   )
 }

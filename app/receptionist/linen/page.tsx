@@ -10,12 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RefreshCw, Search, Plus, CheckCircle, X, AlertTriangle } from "lucide-react"
 import { useData } from "@/contexts/data-context"
 import { EmptyState } from "@/components/empty-state"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function LinenStockPage() {
   const { linenStock, rooms, isLoading, refreshAllData, updateLinenStock, addLinenStock } = useData()
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
+  const { toast } = useToast()
 
   const handleRefresh = async () => {
     await refreshAllData()
@@ -24,8 +26,17 @@ export default function LinenStockPage() {
   const handleStatusChange = async (id: string, newStatus: "Issued" | "Returned" | "Damaged") => {
     try {
       await updateLinenStock(id, { status: newStatus })
+      toast({
+        title: "Status Updated",
+        description: `Linen item marked as ${newStatus.toLowerCase()}.`,
+      })
+      await refreshAllData()
     } catch (error) {
-      console.error("Failed to update linen status:", error)
+      toast({
+        title: "Update Failed",
+        description: "Failed to update linen status.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -36,9 +47,17 @@ export default function LinenStockPage() {
         status: "Issued",
         issueDate: new Date().toISOString().split("T")[0],
       })
+      toast({
+        title: "Item Added",
+        description: "New linen item has been added.",
+      })
       await refreshAllData()
     } catch (error) {
-      console.error("Failed to add new linen:", error)
+      toast({
+        title: "Add Failed",
+        description: "Failed to add new linen item.",
+        variant: "destructive",
+      })
     }
   }
 

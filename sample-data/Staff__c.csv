@@ -1,0 +1,9 @@
+Name,Role__c,Photo_URL__c,Shift_Start__c,Shift_End__c
+Alex Security,Security,https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150,06:00:00.000Z,18:00:00.000Z
+Maria Receptionist,Receptionist,https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150,08:00:00.000Z,20:00:00.000Z
+James Cleaner,Cleaner,https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=150,06:00:00.000Z,14:00:00.000Z
+Sophie Front Desk,Receptionist,https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150,14:00:00.000Z,22:00:00.000Z
+Carlos Night Security,Security,https://images.unsplash.com/photo-1566492031773-4f4e44671d66?w=150,22:00:00.000Z,06:00:00.000Z
+Linda Housekeeping,Cleaner,https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150,08:00:00.000Z,16:00:00.000Z
+Tom Manager,Security,https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150,09:00:00.000Z,17:00:00.000Z
+Rachel Assistant,Receptionist,https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150,16:00:00.000Z,00:00:00.000Z

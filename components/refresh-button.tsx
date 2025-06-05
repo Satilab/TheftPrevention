@@ -20,9 +20,17 @@ export function RefreshButton({
   size = "default",
   className = "",
 }: RefreshButtonProps) {
+  const handleClick = async () => {
+    try {
+      await onClick()
+    } catch (error) {
+      console.error("Refresh failed:", error)
+    }
+  }
+
   return (
     <div className="flex flex-col items-end">
-      <Button variant={variant} size={size} onClick={onClick} disabled={isLoading} className={className}>
+      <Button variant={variant} size={size} onClick={handleClick} disabled={isLoading} className={className}>
         <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
         {isLoading ? "Refreshing..." : "Refresh"}
       </Button>

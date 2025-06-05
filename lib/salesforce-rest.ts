@@ -67,6 +67,7 @@ export class SalesforceRestClient {
 
         this.lastError = errorData.error || `Query failed: ${response.statusText}`
         console.error("❌ Query failed:", this.lastError)
+        console.error("❌ Failed query:", soql)
         throw new Error(this.lastError)
       }
 
@@ -76,6 +77,7 @@ export class SalesforceRestClient {
     } catch (error) {
       this.lastError = error instanceof Error ? error.message : "Unknown query error"
       console.error("❌ Query error:", error)
+      console.error("❌ Failed query:", soql)
       throw error
     }
   }

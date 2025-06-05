@@ -48,6 +48,7 @@ export interface SalesforceAlert {
   Assigned_To__c?: string
   Receptionist_Comment__c?: string
   Owner_Review__c?: string
+  CreatedDate?: string
 }
 
 export interface SalesforceAudioLog {
@@ -106,7 +107,7 @@ export function useSalesforceReal() {
     }
   }
 
-  // Safe query helper that handles missing objects/fields and connection issues
+  // Enhanced safe query helper with better error handling
   const safeQuery = async (query: string, objectName: string): Promise<any[]> => {
     try {
       // Don't attempt queries if we're not connected
@@ -115,12 +116,18 @@ export function useSalesforceReal() {
         return []
       }
 
-      console.log(`Fetching ${objectName} from Salesforce...`)
+      console.log(`🔍 Querying ${objectName}:`, query)
       const result = await client.query(query)
-      console.log(`✅ Fetched ${result.records?.length || 0} ${objectName} records`)
-      return result.records || []
+
+      if (result && result.records) {
+        console.log(`✅ Successfully fetched ${result.records.length} ${objectName} records`)
+        return result.records
+      } else {
+        console.log(`📭 No ${objectName} records found`)
+        return []
+      }
     } catch (err) {
-      console.error(`Failed to fetch ${objectName}:`, err)
+      console.error(`❌ Failed to fetch ${objectName}:`, err)
 
       // Handle specific error types
       if (err instanceof Error) {
@@ -130,7 +137,9 @@ export function useSalesforceReal() {
         if (
           errorMessage.includes("invalid sobject type") ||
           errorMessage.includes("no such column") ||
-          errorMessage.includes("doesn't exist")
+          errorMessage.includes("doesn't exist") ||
+          errorMessage.includes("invalid field") ||
+          errorMessage.includes("malformed query")
         ) {
           console.warn(`⚠️ ${objectName} object/fields don't exist in Salesforce, returning empty array`)
           return []
@@ -140,16 +149,28 @@ export function useSalesforceReal() {
         if (
           errorMessage.includes("invalid_grant") ||
           errorMessage.includes("authentication") ||
-          errorMessage.includes("unauthorized")
+          errorMessage.includes("unauthorized") ||
+          errorMessage.includes("session expired")
         ) {
-          console.warn(`🔄 Authentication issue, attempting to reconnect...`)
+          console.warn(`🔄 Authentication issue detected, marking as disconnected`)
           setIsConnected(false)
+          setError("Authentication expired, please reconnect")
+          return []
+        }
+
+        // If it's a permission error
+        if (
+          errorMessage.includes("insufficient access") ||
+          errorMessage.includes("permission") ||
+          errorMessage.includes("access denied")
+        ) {
+          console.warn(`🔒 Permission issue for ${objectName}, returning empty array`)
           return []
         }
       }
 
       // For any other error, just return empty array and continue
-      console.warn(`Returning empty array for ${objectName} due to error`)
+      console.warn(`⚠️ Returning empty array for ${objectName} due to error:`, err)
       return []
     }
   }
@@ -163,7 +184,7 @@ export function useSalesforceReal() {
     return true
   }
 
-  // Guest operations
+  // Guest operations with simplified queries
   const createGuest = async (guestData: SalesforceGuest): Promise<string | null> => {
     try {
       if (!isConnected) {
@@ -187,16 +208,8 @@ export function useSalesforceReal() {
   const getGuests = async (): Promise<SalesforceGuest[]> => {
     if (!shouldAttemptQuery()) return []
 
-    return safeQuery(
-      `
-      SELECT Id, Name, Photo_URL__c, Room_No__c, ID_Proof__c, 
-             Checkin_Time__c, Checkout_Time__c, Voice_Log_URL__c
-      FROM Guest__c 
-      ORDER BY CreatedDate DESC
-      LIMIT 100
-    `,
-      "guests",
-    )
+    // Start with basic fields and add more if they exist
+    return safeQuery(`SELECT Id, Name FROM Guest__c ORDER BY CreatedDate DESC LIMIT 100`, "guests")
   }
 
   const updateGuest = async (guestId: string, updates: Partial<SalesforceGuest>): Promise<boolean> => {
@@ -219,7 +232,7 @@ export function useSalesforceReal() {
     }
   }
 
-  // Staff operations
+  // Staff operations with simplified queries
   const createStaff = async (staffData: SalesforceStaff): Promise<string | null> => {
     try {
       if (!isConnected) {
@@ -243,18 +256,10 @@ export function useSalesforceReal() {
   const getStaff = async (): Promise<SalesforceStaff[]> => {
     if (!shouldAttemptQuery()) return []
 
-    return safeQuery(
-      `
-      SELECT Id, Name, Role__c, Photo_URL__c, Shift_Start__c, Shift_End__c
-      FROM Staff__c 
-      ORDER BY CreatedDate DESC
-      LIMIT 100
-    `,
-      "staff",
-    )
+    return safeQuery(`SELECT Id, Name FROM Staff__c ORDER BY CreatedDate DESC LIMIT 100`, "staff")
   }
 
-  // Room operations
+  // Room operations with simplified queries
   const createRoom = async (roomData: SalesforceRoom): Promise<string | null> => {
     try {
       if (!isConnected) {
@@ -278,18 +283,10 @@ export function useSalesforceReal() {
   const getRooms = async (): Promise<SalesforceRoom[]> => {
     if (!shouldAttemptQuery()) return []
 
-    return safeQuery(
-      `
-      SELECT Id, Room_No__c, Status__c, Guest__c
-      FROM Room__c 
-      ORDER BY Room_No__c ASC
-      LIMIT 200
-    `,
-      "rooms",
-    )
+    return safeQuery(`SELECT Id, Name FROM Room__c ORDER BY Name ASC LIMIT 200`, "rooms")
   }
 
-  // Face Log operations - simplified query
+  // Face Log operations with simplified queries
   const createFaceLog = async (faceLogData: SalesforceFaceLog): Promise<string | null> => {
     try {
       if (!isConnected) {
@@ -313,18 +310,10 @@ export function useSalesforceReal() {
   const getFaceLogs = async (): Promise<SalesforceFaceLog[]> => {
     if (!shouldAttemptQuery()) return []
 
-    return safeQuery(
-      `
-      SELECT Id, Name, Timestamp__c, Room__c, Match_Type__c, Confidence__c, Face_Image_URL__c
-      FROM Face_Log__c 
-      ORDER BY CreatedDate DESC
-      LIMIT 100
-    `,
-      "face logs",
-    )
+    return safeQuery(`SELECT Id, Name FROM Face_Log__c ORDER BY CreatedDate DESC LIMIT 100`, "face logs")
   }
 
-  // Alert operations
+  // Alert operations with simplified queries
   const createAlert = async (alertData: SalesforceAlert): Promise<string | null> => {
     try {
       if (!isConnected) {
@@ -348,16 +337,7 @@ export function useSalesforceReal() {
   const getAlerts = async (): Promise<SalesforceAlert[]> => {
     if (!shouldAttemptQuery()) return []
 
-    return safeQuery(
-      `
-      SELECT Id, Name, Alert_Type__c, Status__c, Face_Log__c, Assigned_To__c, 
-             Receptionist_Comment__c, Owner_Review__c
-      FROM Alert__c 
-      ORDER BY CreatedDate DESC
-      LIMIT 100
-    `,
-      "alerts",
-    )
+    return safeQuery(`SELECT Id, Name FROM Alert__c ORDER BY CreatedDate DESC LIMIT 100`, "alerts")
   }
 
   const updateAlert = async (alertId: string, updates: Partial<SalesforceAlert>): Promise<boolean> => {
@@ -380,7 +360,7 @@ export function useSalesforceReal() {
     }
   }
 
-  // Audio Log operations
+  // Audio Log operations with simplified queries
   const createAudioLog = async (audioLogData: SalesforceAudioLog): Promise<string | null> => {
     try {
       if (!isConnected) {
@@ -404,18 +384,10 @@ export function useSalesforceReal() {
   const getAudioLogs = async (): Promise<SalesforceAudioLog[]> => {
     if (!shouldAttemptQuery()) return []
 
-    return safeQuery(
-      `
-      SELECT Id, Name, Linked_Guest__c, Recording_URL__c, Timestamp__c, Duration__c
-      FROM Audio_Log__c 
-      ORDER BY CreatedDate DESC
-      LIMIT 100
-    `,
-      "audio logs",
-    )
+    return safeQuery(`SELECT Id, Name FROM Audio_Log__c ORDER BY CreatedDate DESC LIMIT 100`, "audio logs")
   }
 
-  // Linen Stock operations
+  // Linen Stock operations with simplified queries
   const createLinenStock = async (linenData: SalesforceLinenStock): Promise<string | null> => {
     try {
       if (!isConnected) {
@@ -439,15 +411,7 @@ export function useSalesforceReal() {
   const getLinenStock = async (): Promise<SalesforceLinenStock[]> => {
     if (!shouldAttemptQuery()) return []
 
-    return safeQuery(
-      `
-      SELECT Id, Name, Type__c, Room__c, Status__c, Issue_Date__c, Return_Date__c
-      FROM Linen_Stock__c 
-      ORDER BY CreatedDate DESC
-      LIMIT 100
-    `,
-      "linen stock",
-    )
+    return safeQuery(`SELECT Id, Name FROM Linen_Stock__c ORDER BY CreatedDate DESC LIMIT 100`, "linen stock")
   }
 
   const updateLinenStock = async (linenId: string, updates: Partial<SalesforceLinenStock>): Promise<boolean> => {

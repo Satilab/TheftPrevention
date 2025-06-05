@@ -4,11 +4,12 @@ import { useData } from "@/contexts/data-context"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 export function DashboardChart() {
-  const { alerts, isLoading } = useData()
+  const { alerts = [], isLoading = false } = useData() || {}
 
-  // Generate chart data from actual alerts
+  // Generate chart data from actual alerts with proper null checks
   const generateChartData = () => {
-    if (alerts.length === 0) {
+    // Check if alerts is undefined or empty
+    if (!Array.isArray(alerts) || alerts.length === 0) {
       return []
     }
 
@@ -25,16 +26,20 @@ export function DashboardChart() {
       const dayEnd = new Date(date)
       dayEnd.setHours(23, 59, 59, 999)
 
-      const alertsForDay = alerts.filter((alert) => {
-        const alertDate = new Date(alert.timestamp)
-        return alertDate >= dayStart && alertDate <= dayEnd
-      })
+      // Filter alerts for this day with null checks
+      const alertsForDay = Array.isArray(alerts)
+        ? alerts.filter((alert) => {
+            if (!alert || !alert.timestamp) return false
+            const alertDate = new Date(alert.timestamp)
+            return alertDate >= dayStart && alertDate <= dayEnd
+          })
+        : []
 
       return {
         date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         alerts: alertsForDay.length,
-        resolved: alertsForDay.filter((a) => a.status === "Resolved").length,
-        open: alertsForDay.filter((a) => a.status === "Open").length,
+        resolved: alertsForDay.filter((a) => a?.status === "Resolved").length,
+        open: alertsForDay.filter((a) => a?.status === "Open").length,
       }
     })
   }
@@ -49,7 +54,7 @@ export function DashboardChart() {
     )
   }
 
-  if (chartData.length === 0) {
+  if (!chartData || chartData.length === 0) {
     return (
       <div className="h-[300px] flex flex-col items-center justify-center text-center">
         <div className="text-muted-foreground">

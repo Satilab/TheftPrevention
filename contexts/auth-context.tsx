@@ -8,13 +8,15 @@ interface User {
   username: string
   role: "owner" | "receptionist"
   name: string
+  email?: string
+  avatar?: string
 }
 
 interface AuthContextType {
   user: User | null
   isLoading: boolean
   login: (username: string, password: string) => Promise<boolean>
-  logout: () => void
+  logout: () => Promise<void>
   isAuthenticated: boolean
   role: "owner" | "receptionist"
 }
@@ -28,14 +30,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Auto-login for testing purposes
   useEffect(() => {
     const autoLogin = () => {
-      const testUser: User = {
-        id: "test_user_1",
-        username: "owner",
-        role: "owner",
-        name: "Test Owner",
+      // Check if user was previously logged in
+      const savedUser = localStorage.getItem("hotel_user")
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser)
+          setUser(parsedUser)
+        } catch (error) {
+          console.error("Error parsing saved user:", error)
+          localStorage.removeItem("hotel_user")
+        }
+      } else {
+        // Auto-login test user for development
+        const testUser: User = {
+          id: "test_user_1",
+          username: "owner",
+          role: "owner",
+          name: "Test Owner",
+          email: "owner@hotel.com",
+        }
+        setUser(testUser)
+        localStorage.setItem("hotel_user", JSON.stringify(testUser))
       }
-
-      setUser(testUser)
       setIsLoading(false)
     }
 
@@ -44,12 +60,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // Not used during testing, but keeping for future use
-    return true
+    setIsLoading(true)
+
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Simple validation for demo
+      if (password === "password") {
+        const newUser: User = {
+          id: `user_${Date.now()}`,
+          username,
+          role: username.toLowerCase().includes("owner") ? "owner" : "receptionist",
+          name: username.toLowerCase().includes("owner") ? "Hotel Owner" : "Hotel Receptionist",
+          email: `${username}@hotel.com`,
+        }
+
+        setUser(newUser)
+        localStorage.setItem("hotel_user", JSON.stringify(newUser))
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error("Login error:", error)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const logout = () => {
-    // Not used during testing
+  const logout = async (): Promise<void> => {
+    setIsLoading(true)
+
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      // Clear user state and localStorage
+      setUser(null)
+      localStorage.removeItem("hotel_user")
+
+      // Force redirect to login page
+      window.location.href = "/login"
+    } catch (error) {
+      console.error("Logout error:", error)
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -59,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         logout,
-        isAuthenticated: true, // Always authenticated for testing
+        isAuthenticated: !!user,
         role: user?.role || "owner",
       }}
     >

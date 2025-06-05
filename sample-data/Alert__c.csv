@@ -1,0 +1,11 @@
+Name,Alert_Type__c,Status__c,Face_Log__c,Assigned_To__c,Receptionist_Comment__c,Owner_Review__c
+Security Alert 1,Intruder,Open,,,Guest reported suspicious activity,
+Security Alert 2,Mismatch,Responded,,,Face doesn't match guest record,Under investigation
+Security Alert 3,Tailgating,Resolved,,,Multiple people entered with one keycard,False alarm - family members
+Security Alert 4,Intruder,Escalated,,,Unauthorized person in restricted area,Security called
+Security Alert 5,Mismatch,Open,,,Guest photo doesn't match ID,
+Security Alert 6,Tailgating,Responded,,,Two people entered together,Checking with guest
+Security Alert 7,Intruder,Open,,,Unknown person in hallway,
+Security Alert 8,Mismatch,Resolved,,,Facial recognition error,System calibration needed
+Security Alert 9,Tailgating,Escalated,,,Suspicious group activity,Police notified
+Security Alert 10,Intruder,Responded,,,Unauthorized access attempt,Security investigating
