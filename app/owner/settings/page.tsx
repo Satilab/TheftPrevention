@@ -8,8 +8,9 @@ import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Save, Bell, Shield, Mic, Users, AlertTriangle } from "lucide-react"
+import { Save, Bell, Shield, Mic, Users, AlertTriangle, Cloud } from "lucide-react"
 import { useState } from "react"
+import { SalesforceIntegration } from "@/components/salesforce-integration"
 
 export default function OwnerSettingsPage() {
   const [aiSensitivity, setAiSensitivity] = useState([75])
@@ -52,6 +53,10 @@ export default function OwnerSettingsPage() {
           <TabsTrigger value="staff" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span>Staff</span>
+          </TabsTrigger>
+          <TabsTrigger value="salesforce" className="flex items-center gap-2">
+            <Cloud className="h-4 w-4" />
+            <span>Salesforce</span>
           </TabsTrigger>
         </TabsList>
 
@@ -513,6 +518,9 @@ export default function OwnerSettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="salesforce">
+          <SalesforceIntegration />
         </TabsContent>
       </Tabs>
     </div>

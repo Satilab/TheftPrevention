@@ -2,191 +2,107 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Button } from "@/components/ui/button"
-import { Users, AlertTriangle, CheckCircle, AlertOctagon, TrendingUp, Eye, Download } from "lucide-react"
 import { DashboardChart } from "@/components/dashboard-chart"
 import { RecentActivity } from "@/components/recent-activity"
-import { AdvancedAnalytics } from "@/components/advanced-analytics"
 import { RealTimeAlerts } from "@/components/real-time-alerts"
+import { AdvancedAnalytics } from "@/components/advanced-analytics"
+import { RefreshButton } from "@/components/refresh-button"
+import { useData } from "@/contexts/data-context"
+import { AlertTriangle, CheckCircle, Clock, Users } from "lucide-react"
 
-export default function OwnerDashboard() {
+export default function OwnerDashboardPage() {
+  const { alerts, guests, rooms, faceLogs, isLoading, refreshAllData, lastRefresh } = useData()
+
+  // Calculate metrics from real data
+  const totalGuests = guests.filter((g) => g.status === "checked-in").length
+  const totalAlerts = alerts.length
+  const resolvedAlerts = alerts.filter((a) => a.status === "Resolved").length
+  const openEscalations = alerts.filter((a) => a.status === "Escalated").length
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Owner Dashboard</h1>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button variant="outline" size="sm">
-            <Eye className="h-4 w-4 mr-2" />
-            Live View
-          </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back to your security dashboard</p>
         </div>
+        <RefreshButton onClick={refreshAllData} isLoading={isLoading} lastRefresh={lastRefresh} />
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Guests Today</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalGuests}</div>
+            <p className="text-xs text-muted-foreground">Currently checked in</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Intrusions Detected</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalAlerts}</div>
+            <p className="text-xs text-muted-foreground">Total security alerts</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Alerts Resolved</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{resolvedAlerts}</div>
+            <p className="text-xs text-muted-foreground">Successfully handled</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Open Escalations</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{openEscalations}</div>
+            <p className="text-xs text-muted-foreground">Awaiting resolution</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Security Alerts</CardTitle>
+            <CardDescription>Alert activity over time</CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <DashboardChart />
+          </CardContent>
+        </Card>
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Latest security events and guest activities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RecentActivity />
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="alerts" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="alerts">Real-time Alerts</TabsTrigger>
+          <TabsTrigger value="analytics">Advanced Analytics</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Guests Today</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">127</div>
-                <p className="text-xs text-muted-foreground">+19% from yesterday</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Intrusions Detected</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">3</div>
-                <p className="text-xs text-muted-foreground">+2 from yesterday</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Alerts Resolved</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">8</div>
-                <p className="text-xs text-muted-foreground">+3 from yesterday</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Open Escalations</CardTitle>
-                <AlertOctagon className="h-4 w-4 text-amber-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">2</div>
-                <p className="text-xs text-muted-foreground">-1 from yesterday</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="lg:col-span-4">
-              <CardHeader>
-                <CardTitle>Alerts Over Time</CardTitle>
-                <CardDescription>Alert frequency over the past 7 days</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DashboardChart />
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-3">
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest security events across the hotel</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RecentActivity />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Room Status Overview</CardTitle>
-                <CardDescription>Current status of all hotel rooms</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">45</p>
-                    <p className="text-sm text-muted-foreground">Occupied</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600">23</p>
-                    <p className="text-sm text-muted-foreground">Vacant</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-red-600">3</p>
-                    <p className="text-sm text-muted-foreground">Alert</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-yellow-600">2</p>
-                    <p className="text-sm text-muted-foreground">Maintenance</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Staff Performance</CardTitle>
-                <CardDescription>Receptionist response times and efficiency</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Sarah (Receptionist)</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-green-600">95% efficiency</span>
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">John (Receptionist)</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-green-600">92% efficiency</span>
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Average Response Time</span>
-                    <span className="text-sm font-medium">2.3 minutes</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Alerts Resolved Today</span>
-                    <span className="text-sm font-medium">8/10</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="alerts" className="space-y-4">
+          <RealTimeAlerts />
         </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Advanced Analytics</CardTitle>
-              <CardDescription>Detailed security metrics and trends</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AdvancedAnalytics />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="alerts" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Real-time Security Alerts</CardTitle>
-              <CardDescription>Live monitoring of security events</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RealTimeAlerts />
-            </CardContent>
-          </Card>
+        <TabsContent value="analytics" className="space-y-4">
+          <AdvancedAnalytics />
         </TabsContent>
       </Tabs>
     </div>

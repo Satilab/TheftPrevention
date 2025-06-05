@@ -2,28 +2,21 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-import { Loader2 } from "lucide-react"
 
 export default function HomePage() {
-  const { user, role, isLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!isLoading) {
-      if (user && role) {
-        // Redirect based on role to the dashboard
-        router.push("/dashboard")
-      } else {
-        // No user, redirect to login
-        router.push("/login")
-      }
-    }
-  }, [user, role, isLoading, router])
+    // Redirect directly to owner dashboard for testing
+    router.push("/owner/dashboard")
+  }, [router])
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold mb-4">Hotel Security System</h1>
+        <p className="text-gray-600">Redirecting to dashboard...</p>
+      </div>
     </div>
   )
 }

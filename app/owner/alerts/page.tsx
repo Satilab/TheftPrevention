@@ -8,18 +8,39 @@ import { AlertList } from "@/components/alert-list"
 import { VoiceAlertList } from "@/components/voice-alert-list"
 import { Button } from "@/components/ui/button"
 import { Download, RefreshCw, Mic, Shield, Bell, AlertTriangle } from "lucide-react"
+import { useData } from "@/contexts/data-context"
 
 export default function OwnerAlertsPage() {
+  const { alerts, audioLogs, isLoading } = useData()
   const [filterStatus, setFilterStatus] = useState<string | null>(null)
   const [filterType, setFilterType] = useState<string | null>(null)
   const [filterRoom, setFilterRoom] = useState<string | null>(null)
   const [filterReceptionist, setFilterReceptionist] = useState<string | null>(null)
+
+  // Calculate metrics from actual data
+  const pendingAlerts = alerts.filter((a) => a.status === "Open").length
+  const escalatedAlerts = alerts.filter((a) => a.status === "Escalated").length
+  const voiceAlerts = audioLogs.filter((a) => a.flagged).length
+  const resolvedToday = alerts.filter(
+    (a) => a.status === "Resolved" && a.timestamp.toDateString() === new Date().toDateString(),
+  ).length
 
   const handleResetFilters = () => {
     setFilterStatus(null)
     setFilterType(null)
     setFilterRoom(null)
     setFilterReceptionist(null)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[500px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading alerts...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -42,7 +63,7 @@ export default function OwnerAlertsPage() {
         <Card className="bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800">
           <CardContent className="flex items-center justify-between p-6">
             <div className="flex flex-col">
-              <span className="text-3xl font-bold text-red-600 dark:text-red-400">4</span>
+              <span className="text-3xl font-bold text-red-600 dark:text-red-400">{pendingAlerts}</span>
               <span className="text-sm text-muted-foreground">Pending Alerts</span>
             </div>
             <AlertTriangle className="h-8 w-8 text-red-500" />
@@ -52,7 +73,7 @@ export default function OwnerAlertsPage() {
         <Card className="bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
           <CardContent className="flex items-center justify-between p-6">
             <div className="flex flex-col">
-              <span className="text-3xl font-bold text-amber-600 dark:text-amber-400">2</span>
+              <span className="text-3xl font-bold text-amber-600 dark:text-amber-400">{escalatedAlerts}</span>
               <span className="text-sm text-muted-foreground">Escalated</span>
             </div>
             <Bell className="h-8 w-8 text-amber-500" />
@@ -62,7 +83,7 @@ export default function OwnerAlertsPage() {
         <Card className="bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
           <CardContent className="flex items-center justify-between p-6">
             <div className="flex flex-col">
-              <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">3</span>
+              <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">{voiceAlerts}</span>
               <span className="text-sm text-muted-foreground">Voice Alerts</span>
             </div>
             <Mic className="h-8 w-8 text-blue-500" />
@@ -72,7 +93,7 @@ export default function OwnerAlertsPage() {
         <Card className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
           <CardContent className="flex items-center justify-between p-6">
             <div className="flex flex-col">
-              <span className="text-3xl font-bold text-green-600 dark:text-green-400">12</span>
+              <span className="text-3xl font-bold text-green-600 dark:text-green-400">{resolvedToday}</span>
               <span className="text-sm text-muted-foreground">Resolved Today</span>
             </div>
             <Shield className="h-8 w-8 text-green-500" />
@@ -178,19 +199,23 @@ export default function OwnerAlertsPage() {
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-600">23</p>
+                  <p className="text-2xl font-bold text-blue-600">{audioLogs.length}</p>
                   <p className="text-sm text-muted-foreground">Today's Recordings</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-red-600">3</p>
+                  <p className="text-2xl font-bold text-red-600">{voiceAlerts}</p>
                   <p className="text-sm text-muted-foreground">Flagged Conversations</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-amber-600">2</p>
+                  <p className="text-2xl font-bold text-amber-600">
+                    {audioLogs.filter((a) => a.flagged && a.escalated).length}
+                  </p>
                   <p className="text-sm text-muted-foreground">Escalated Issues</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">18</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {audioLogs.filter((a) => a.flagged && a.resolved).length}
+                  </p>
                   <p className="text-sm text-muted-foreground">Resolved</p>
                 </div>
               </div>
@@ -215,7 +240,7 @@ export default function OwnerAlertsPage() {
               <CardDescription>Alerts that require immediate owner attention</CardDescription>
             </CardHeader>
             <CardContent>
-              <AlertList status="escalated" />
+              <AlertList status="Escalated" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -227,7 +252,7 @@ export default function OwnerAlertsPage() {
               <CardDescription>Successfully handled security alerts</CardDescription>
             </CardHeader>
             <CardContent>
-              <AlertList status="resolved" />
+              <AlertList status="Resolved" />
             </CardContent>
           </Card>
         </TabsContent>

@@ -4,106 +4,66 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Eye, AlertTriangle, Users, Clock } from "lucide-react"
-
-interface Room {
-  id: string
-  name: string
-  type: "office" | "lobby" | "conference" | "storage"
-  status: "active" | "inactive" | "alert"
-  occupancy: number
-  lastActivity: string
-  alertCount: number
-}
-
-const rooms: Room[] = [
-  {
-    id: "R001",
-    name: "Main Lobby",
-    type: "lobby",
-    status: "active",
-    occupancy: 12,
-    lastActivity: "2 min ago",
-    alertCount: 0,
-  },
-  {
-    id: "R002",
-    name: "Conference Room A",
-    type: "conference",
-    status: "active",
-    occupancy: 8,
-    lastActivity: "5 min ago",
-    alertCount: 1,
-  },
-  {
-    id: "R003",
-    name: "Office 101",
-    type: "office",
-    status: "alert",
-    occupancy: 1,
-    lastActivity: "1 min ago",
-    alertCount: 3,
-  },
-  {
-    id: "R004",
-    name: "Storage Room",
-    type: "storage",
-    status: "inactive",
-    occupancy: 0,
-    lastActivity: "2 hours ago",
-    alertCount: 0,
-  },
-  {
-    id: "R005",
-    name: "Conference Room B",
-    type: "conference",
-    status: "active",
-    occupancy: 4,
-    lastActivity: "10 min ago",
-    alertCount: 0,
-  },
-  {
-    id: "R006",
-    name: "Office 102",
-    type: "office",
-    status: "active",
-    occupancy: 2,
-    lastActivity: "3 min ago",
-    alertCount: 0,
-  },
-]
+import { Eye, AlertTriangle, Users, Clock, Plus } from "lucide-react"
+import { useData } from "@/contexts/data-context"
 
 interface RoomMapProps {
   liveView?: boolean
 }
 
 export const RoomMap = ({ liveView = true }: RoomMapProps) => {
+  const { rooms, isLoading } = useData()
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null)
 
-  const getStatusColor = (status: Room["status"]) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "active":
+      case "Occupied":
         return "bg-green-500"
-      case "alert":
+      case "Alerted":
         return "bg-red-500"
-      case "inactive":
-        return "bg-gray-400"
+      case "Vacant":
+        return "bg-blue-500"
       default:
         return "bg-gray-400"
     }
   }
 
-  const getStatusBadgeVariant = (status: Room["status"]) => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case "active":
+      case "Occupied":
         return "default"
-      case "alert":
+      case "Alerted":
         return "destructive"
-      case "inactive":
+      case "Vacant":
         return "secondary"
       default:
         return "secondary"
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (rooms.length === 0) {
+    return (
+      <div className="w-full h-full">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center h-64 text-center p-6">
+            <p className="text-muted-foreground">No rooms found</p>
+            <p className="text-sm text-muted-foreground mt-2">Add rooms to see them on the map</p>
+            <Button className="mt-4" variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Rooms
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -119,7 +79,7 @@ export const RoomMap = ({ liveView = true }: RoomMapProps) => {
           >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{room.name}</CardTitle>
+                <CardTitle className="text-lg">Room {room.roomNumber}</CardTitle>
                 <div className={`w-3 h-3 rounded-full ${getStatusColor(room.status)}`} />
               </div>
               <div className="flex items-center gap-2">
@@ -135,18 +95,18 @@ export const RoomMap = ({ liveView = true }: RoomMapProps) => {
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-1">
                   <Users className="w-4 h-4" />
-                  <span>{room.occupancy} people</span>
+                  <span>{room.status === "Occupied" ? "Occupied" : "Empty"}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  <span>{room.lastActivity}</span>
+                  <span>Just now</span>
                 </div>
               </div>
 
-              {room.alertCount > 0 && (
+              {room.status === "Alerted" && (
                 <div className="flex items-center gap-1 text-red-600">
                   <AlertTriangle className="w-4 h-4" />
-                  <span className="text-sm">{room.alertCount} alert(s)</span>
+                  <span className="text-sm">Security alert active</span>
                 </div>
               )}
 
@@ -161,15 +121,11 @@ export const RoomMap = ({ liveView = true }: RoomMapProps) => {
                 <div className="mt-3 p-3 bg-muted rounded-lg">
                   <h4 className="font-medium mb-2">Room Details</h4>
                   <div className="space-y-1 text-sm">
-                    <div>
-                      Type: <span className="capitalize">{room.type}</span>
-                    </div>
+                    <div>Room Number: {room.roomNumber}</div>
                     <div>
                       Status: <span className="capitalize">{room.status}</span>
                     </div>
-                    <div>Current Occupancy: {room.occupancy}</div>
-                    <div>Last Activity: {room.lastActivity}</div>
-                    {room.alertCount > 0 && <div className="text-red-600">Active Alerts: {room.alertCount}</div>}
+                    {room.guestId && <div>Guest ID: {room.guestId}</div>}
                   </div>
                 </div>
               )}
@@ -181,5 +137,4 @@ export const RoomMap = ({ liveView = true }: RoomMapProps) => {
   )
 }
 
-// Also export as default for backward compatibility
 export default RoomMap

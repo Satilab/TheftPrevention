@@ -20,167 +20,113 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
-
-// Mock guest data
-const guestData = [
-  {
-    id: "G001",
-    name: "John Smith",
-    room: "101",
-    checkIn: "2023-05-28T14:30:00",
-    checkOut: "2023-05-30T11:00:00",
-    status: "checked-in",
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-  {
-    id: "G002",
-    name: "Emily Johnson",
-    room: "203",
-    checkIn: "2023-05-29T15:45:00",
-    checkOut: "2023-06-02T10:00:00",
-    status: "checked-in",
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-  {
-    id: "G003",
-    name: "Michael Brown",
-    room: "305",
-    checkIn: "2023-05-27T12:15:00",
-    checkOut: "2023-05-29T10:30:00",
-    status: "checked-out",
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-  {
-    id: "G004",
-    name: "Sarah Wilson",
-    room: "402",
-    checkIn: null,
-    checkOut: "2023-06-05T11:00:00",
-    status: "not-arrived",
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-  {
-    id: "G005",
-    name: "David Lee",
-    room: "204",
-    checkIn: "2023-05-26T13:20:00",
-    checkOut: "2023-05-28T09:45:00",
-    status: "checked-out",
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-]
-
-type GuestStatus = "not-arrived" | "checked-in" | "checked-out"
-
-interface Guest {
-  id: string
-  name: string
-  room: string
-  checkIn: string | null
-  checkOut: string | null
-  status: GuestStatus
-  avatar: string
-}
+import { useData } from "@/contexts/data-context"
 
 export default function CheckInPage() {
   const { toast } = useToast()
-  const [guests, setGuests] = useState<Guest[]>(guestData)
+  const { guests, isLoading, updateGuest, isConnectedToSalesforce } = useData()
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
+  const [selectedGuest, setSelectedGuest] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [extendDays, setExtendDays] = useState("1")
+  const [processingGuests, setProcessingGuests] = useState<Record<string, boolean>>({})
 
   const filteredGuests = guests.filter(
     (guest) =>
       guest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      guest.room.includes(searchQuery) ||
+      guest.roomNumber?.includes(searchQuery) ||
       guest.id.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const handleCheckIn = (guest: Guest) => {
-    setSelectedGuest(guest)
-    setIsProcessing(true)
+  const handleCheckIn = async (guest: any) => {
+    setProcessingGuests((prev) => ({ ...prev, [guest.id]: true }))
 
-    // Simulate API call
-    setTimeout(() => {
-      setGuests((prev) =>
-        prev.map((g) =>
-          g.id === guest.id
-            ? {
-                ...g,
-                status: "checked-in",
-                checkIn: new Date().toISOString(),
-              }
-            : g,
-        ),
-      )
-      setIsProcessing(false)
-      setSelectedGuest(null)
+    try {
+      console.log("🔄 Checking in guest:", guest.id)
+
+      // Update guest with check-in date
+      await updateGuest(guest.id, {
+        status: "checked-in",
+        checkInDate: new Date().toISOString().split("T")[0],
+      })
 
       toast({
         title: "Check-In Successful",
-        description: `${guest.name} has been checked in to Room ${guest.room}.`,
+        description: `${guest.name} has been checked in to Room ${guest.roomNumber}.${isConnectedToSalesforce ? " Synced to Salesforce." : ""}`,
       })
-    }, 1500)
+    } catch (error) {
+      console.error("❌ Check-in error:", error)
+      toast({
+        title: "Check-In Failed",
+        description: `Failed to check in ${guest.name}. ${error instanceof Error ? error.message : "Please try again."}`,
+        variant: "destructive",
+      })
+    } finally {
+      setProcessingGuests((prev) => ({ ...prev, [guest.id]: false }))
+    }
   }
 
-  const handleCheckOut = (guest: Guest) => {
-    setSelectedGuest(guest)
-    setIsProcessing(true)
+  const handleCheckOut = async (guest: any) => {
+    setProcessingGuests((prev) => ({ ...prev, [guest.id]: true }))
 
-    // Simulate API call
-    setTimeout(() => {
-      setGuests((prev) =>
-        prev.map((g) =>
-          g.id === guest.id
-            ? {
-                ...g,
-                status: "checked-out",
-                checkOut: new Date().toISOString(),
-              }
-            : g,
-        ),
-      )
-      setIsProcessing(false)
-      setSelectedGuest(null)
+    try {
+      console.log("🔄 Checking out guest:", guest.id)
+
+      // Update guest with check-out date
+      await updateGuest(guest.id, {
+        status: "checked-out",
+        checkOutDate: new Date().toISOString().split("T")[0],
+      })
 
       toast({
         title: "Check-Out Successful",
-        description: `${guest.name} has been checked out from Room ${guest.room}.`,
+        description: `${guest.name} has been checked out from Room ${guest.roomNumber}.${isConnectedToSalesforce ? " Synced to Salesforce." : ""}`,
       })
-    }, 1500)
+    } catch (error) {
+      console.error("❌ Check-out error:", error)
+      toast({
+        title: "Check-Out Failed",
+        description: `Failed to check out ${guest.name}. ${error instanceof Error ? error.message : "Please try again."}`,
+        variant: "destructive",
+      })
+    } finally {
+      setProcessingGuests((prev) => ({ ...prev, [guest.id]: false }))
+    }
   }
 
-  const handleExtendStay = (guest: Guest) => {
-    setSelectedGuest(guest)
-    setIsProcessing(true)
+  const handleExtendStay = async (guest: any) => {
+    setProcessingGuests((prev) => ({ ...prev, [guest.id]: true }))
 
-    // Simulate API call
-    setTimeout(() => {
-      setGuests((prev) =>
-        prev.map((g) => {
-          if (g.id === guest.id && g.checkOut) {
-            const currentCheckOut = new Date(g.checkOut)
-            currentCheckOut.setDate(currentCheckOut.getDate() + Number.parseInt(extendDays))
-            return {
-              ...g,
-              checkOut: currentCheckOut.toISOString(),
-            }
-          }
-          return g
-        }),
-      )
-      setIsProcessing(false)
-      setSelectedGuest(null)
+    try {
+      console.log("🔄 Extending stay for guest:", guest.id, extendDays)
+
+      // Calculate new check-out date
+      const currentCheckOut = guest.checkOutDate ? new Date(guest.checkOutDate) : new Date()
+      const newCheckOut = new Date(currentCheckOut)
+      newCheckOut.setDate(newCheckOut.getDate() + Number.parseInt(extendDays))
+
+      // Update guest with new check-out date
+      await updateGuest(guest.id, {
+        checkOutDate: newCheckOut.toISOString().split("T")[0],
+      })
 
       toast({
         title: "Stay Extended",
-        description: `${guest.name}'s stay has been extended by ${extendDays} days.`,
+        description: `${guest.name}'s stay has been extended by ${extendDays} days.${isConnectedToSalesforce ? " Synced to Salesforce." : ""}`,
       })
-    }, 1500)
+    } catch (error) {
+      console.error("❌ Stay extension error:", error)
+      toast({
+        title: "Extension Failed",
+        description: `Failed to extend stay for ${guest.name}. ${error instanceof Error ? error.message : "Please try again."}`,
+        variant: "destructive",
+      })
+    } finally {
+      setProcessingGuests((prev) => ({ ...prev, [guest.id]: false }))
+    }
   }
 
-  const getStatusBadge = (status: GuestStatus) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "not-arrived":
         return (
@@ -200,15 +146,17 @@ export default function CheckInPage() {
             Checked Out
           </Badge>
         )
+      default:
+        return <Badge variant="outline">{status}</Badge>
     }
   }
 
-  const formatDate = (dateString: string | null) => {
+  const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "—"
     return new Date(dateString).toLocaleString()
   }
 
-  const calculateDuration = (checkIn: string | null, checkOut: string | null) => {
+  const calculateDuration = (checkIn: string | null | undefined, checkOut: string | null | undefined) => {
     if (!checkIn || !checkOut) return "—"
 
     const start = new Date(checkIn)
@@ -219,11 +167,28 @@ export default function CheckInPage() {
     return `${diffDays} day${diffDays !== 1 ? "s" : ""}`
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[500px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading guest data...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Check-In / Check-Out</h1>
         <p className="text-muted-foreground">Manage guest arrivals and departures</p>
+        {!isConnectedToSalesforce && (
+          <div className="mt-2 flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm">Not connected to Salesforce. Changes will only be saved locally.</span>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
@@ -271,12 +236,17 @@ export default function CheckInPage() {
                         <div className="flex flex-col sm:flex-row">
                           <div className="p-4 flex items-center gap-4 sm:w-1/3">
                             <Avatar className="h-10 w-10">
-                              <AvatarImage src={guest.avatar || "/placeholder.svg"} />
+                              <AvatarImage src={guest.photoUrl || "/placeholder.svg"} />
                               <AvatarFallback>{guest.name.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div>
                               <p className="font-medium">{guest.name}</p>
                               <p className="text-sm text-muted-foreground">ID: {guest.id}</p>
+                              {guest.salesforceId && (
+                                <p className="text-xs text-green-600 dark:text-green-400">
+                                  SF: {guest.salesforceId.substring(0, 8)}...
+                                </p>
+                              )}
                             </div>
                           </div>
 
@@ -284,7 +254,7 @@ export default function CheckInPage() {
                             <div className="grid grid-cols-2 gap-2 text-sm">
                               <div>
                                 <p className="font-medium">Room</p>
-                                <p>{guest.room}</p>
+                                <p>{guest.roomNumber}</p>
                               </div>
                               <div>
                                 <p className="font-medium">Status</p>
@@ -292,15 +262,15 @@ export default function CheckInPage() {
                               </div>
                               <div>
                                 <p className="font-medium">Check-In</p>
-                                <p>{formatDate(guest.checkIn)}</p>
+                                <p>{formatDate(guest.checkInDate)}</p>
                               </div>
                               <div>
                                 <p className="font-medium">Check-Out</p>
-                                <p>{formatDate(guest.checkOut)}</p>
+                                <p>{formatDate(guest.checkOutDate)}</p>
                               </div>
                               <div className="col-span-2">
                                 <p className="font-medium">Duration</p>
-                                <p>{calculateDuration(guest.checkIn, guest.checkOut)}</p>
+                                <p>{calculateDuration(guest.checkInDate, guest.checkOutDate)}</p>
                               </div>
                             </div>
 
@@ -309,9 +279,9 @@ export default function CheckInPage() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleCheckIn(guest)}
-                                  disabled={isProcessing && selectedGuest?.id === guest.id}
+                                  disabled={processingGuests[guest.id]}
                                 >
-                                  {isProcessing && selectedGuest?.id === guest.id ? (
+                                  {processingGuests[guest.id] ? (
                                     <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                                   ) : (
                                     <CheckCircle className="mr-2 h-4 w-4" />
@@ -326,9 +296,9 @@ export default function CheckInPage() {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleCheckOut(guest)}
-                                    disabled={isProcessing && selectedGuest?.id === guest.id}
+                                    disabled={processingGuests[guest.id]}
                                   >
-                                    {isProcessing && selectedGuest?.id === guest.id ? (
+                                    {processingGuests[guest.id] ? (
                                       <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                                     ) : (
                                       <LogOut className="mr-2 h-4 w-4" />
@@ -363,15 +333,15 @@ export default function CheckInPage() {
                                         </div>
                                         <div className="space-y-1">
                                           <p className="text-sm font-medium">Current Check-Out</p>
-                                          <p className="text-sm">{formatDate(guest.checkOut)}</p>
+                                          <p className="text-sm">{formatDate(guest.checkOutDate)}</p>
                                         </div>
                                         <div className="space-y-1">
                                           <p className="text-sm font-medium">New Check-Out</p>
                                           <p className="text-sm">
-                                            {guest.checkOut
+                                            {guest.checkOutDate
                                               ? formatDate(
                                                   new Date(
-                                                    new Date(guest.checkOut).getTime() +
+                                                    new Date(guest.checkOutDate).getTime() +
                                                       Number.parseInt(extendDays) * 24 * 60 * 60 * 1000,
                                                   ).toISOString(),
                                                 )
@@ -382,9 +352,9 @@ export default function CheckInPage() {
                                       <DialogFooter>
                                         <Button
                                           onClick={() => handleExtendStay(guest)}
-                                          disabled={isProcessing && selectedGuest?.id === guest.id}
+                                          disabled={processingGuests[guest.id]}
                                         >
-                                          {isProcessing && selectedGuest?.id === guest.id ? (
+                                          {processingGuests[guest.id] ? (
                                             <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                                           ) : (
                                             <Calendar className="mr-2 h-4 w-4" />
@@ -436,12 +406,17 @@ export default function CheckInPage() {
                           <div className="flex flex-col sm:flex-row">
                             <div className="p-4 flex items-center gap-4 sm:w-1/3">
                               <Avatar className="h-10 w-10">
-                                <AvatarImage src={guest.avatar || "/placeholder.svg"} />
+                                <AvatarImage src={guest.photoUrl || "/placeholder.svg"} />
                                 <AvatarFallback>{guest.name.charAt(0)}</AvatarFallback>
                               </Avatar>
                               <div>
                                 <p className="font-medium">{guest.name}</p>
                                 <p className="text-sm text-muted-foreground">ID: {guest.id}</p>
+                                {guest.salesforceId && (
+                                  <p className="text-xs text-green-600 dark:text-green-400">
+                                    SF: {guest.salesforceId.substring(0, 8)}...
+                                  </p>
+                                )}
                               </div>
                             </div>
 
@@ -449,20 +424,20 @@ export default function CheckInPage() {
                               <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div>
                                   <p className="font-medium">Room</p>
-                                  <p>{guest.room}</p>
+                                  <p>{guest.roomNumber}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium">Expected Check-Out</p>
-                                  <p>{formatDate(guest.checkOut)}</p>
+                                  <p>{formatDate(guest.checkOutDate)}</p>
                                 </div>
                               </div>
 
                               <Button
                                 size="sm"
                                 onClick={() => handleCheckIn(guest)}
-                                disabled={isProcessing && selectedGuest?.id === guest.id}
+                                disabled={processingGuests[guest.id]}
                               >
-                                {isProcessing && selectedGuest?.id === guest.id ? (
+                                {processingGuests[guest.id] ? (
                                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
                                   <CheckCircle className="mr-2 h-4 w-4" />
@@ -484,7 +459,7 @@ export default function CheckInPage() {
           <Card>
             <CardHeader>
               <CardTitle>Checked In</CardTitle>
-              <CardDescription>Currently staying guests</CardDescription>
+              <CardDescription>Guests currently staying at the hotel</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -501,12 +476,17 @@ export default function CheckInPage() {
                           <div className="flex flex-col sm:flex-row">
                             <div className="p-4 flex items-center gap-4 sm:w-1/3">
                               <Avatar className="h-10 w-10">
-                                <AvatarImage src={guest.avatar || "/placeholder.svg"} />
+                                <AvatarImage src={guest.photoUrl || "/placeholder.svg"} />
                                 <AvatarFallback>{guest.name.charAt(0)}</AvatarFallback>
                               </Avatar>
                               <div>
                                 <p className="font-medium">{guest.name}</p>
                                 <p className="text-sm text-muted-foreground">ID: {guest.id}</p>
+                                {guest.salesforceId && (
+                                  <p className="text-xs text-green-600 dark:text-green-400">
+                                    SF: {guest.salesforceId.substring(0, 8)}...
+                                  </p>
+                                )}
                               </div>
                             </div>
 
@@ -514,19 +494,19 @@ export default function CheckInPage() {
                               <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div>
                                   <p className="font-medium">Room</p>
-                                  <p>{guest.room}</p>
+                                  <p>{guest.roomNumber}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium">Check-In</p>
-                                  <p>{formatDate(guest.checkIn)}</p>
+                                  <p>{formatDate(guest.checkInDate)}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium">Check-Out</p>
-                                  <p>{formatDate(guest.checkOut)}</p>
+                                  <p>{formatDate(guest.checkOutDate)}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium">Duration</p>
-                                  <p>{calculateDuration(guest.checkIn, guest.checkOut)}</p>
+                                  <p>{calculateDuration(guest.checkInDate, guest.checkOutDate)}</p>
                                 </div>
                               </div>
 
@@ -535,9 +515,9 @@ export default function CheckInPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleCheckOut(guest)}
-                                  disabled={isProcessing && selectedGuest?.id === guest.id}
+                                  disabled={processingGuests[guest.id]}
                                 >
-                                  {isProcessing && selectedGuest?.id === guest.id ? (
+                                  {processingGuests[guest.id] ? (
                                     <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                                   ) : (
                                     <LogOut className="mr-2 h-4 w-4" />
@@ -572,15 +552,15 @@ export default function CheckInPage() {
                                       </div>
                                       <div className="space-y-1">
                                         <p className="text-sm font-medium">Current Check-Out</p>
-                                        <p className="text-sm">{formatDate(guest.checkOut)}</p>
+                                        <p className="text-sm">{formatDate(guest.checkOutDate)}</p>
                                       </div>
                                       <div className="space-y-1">
                                         <p className="text-sm font-medium">New Check-Out</p>
                                         <p className="text-sm">
-                                          {guest.checkOut
+                                          {guest.checkOutDate
                                             ? formatDate(
                                                 new Date(
-                                                  new Date(guest.checkOut).getTime() +
+                                                  new Date(guest.checkOutDate).getTime() +
                                                     Number.parseInt(extendDays) * 24 * 60 * 60 * 1000,
                                                 ).toISOString(),
                                               )
@@ -591,9 +571,9 @@ export default function CheckInPage() {
                                     <DialogFooter>
                                       <Button
                                         onClick={() => handleExtendStay(guest)}
-                                        disabled={isProcessing && selectedGuest?.id === guest.id}
+                                        disabled={processingGuests[guest.id]}
                                       >
-                                        {isProcessing && selectedGuest?.id === guest.id ? (
+                                        {processingGuests[guest.id] ? (
                                           <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                                         ) : (
                                           <Calendar className="mr-2 h-4 w-4" />
@@ -619,13 +599,13 @@ export default function CheckInPage() {
           <Card>
             <CardHeader>
               <CardTitle>Checked Out</CardTitle>
-              <CardDescription>Past guests who have completed their stay</CardDescription>
+              <CardDescription>Guests who have completed their stay</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {filteredGuests.filter((g) => g.status === "checked-out").length === 0 ? (
                   <div className="text-center py-10 text-muted-foreground">
-                    <p>No checked-out guests</p>
+                    <p>No guests have checked out yet</p>
                   </div>
                 ) : (
                   filteredGuests
@@ -636,12 +616,17 @@ export default function CheckInPage() {
                           <div className="flex flex-col sm:flex-row">
                             <div className="p-4 flex items-center gap-4 sm:w-1/3">
                               <Avatar className="h-10 w-10">
-                                <AvatarImage src={guest.avatar || "/placeholder.svg"} />
+                                <AvatarImage src={guest.photoUrl || "/placeholder.svg"} />
                                 <AvatarFallback>{guest.name.charAt(0)}</AvatarFallback>
                               </Avatar>
                               <div>
                                 <p className="font-medium">{guest.name}</p>
                                 <p className="text-sm text-muted-foreground">ID: {guest.id}</p>
+                                {guest.salesforceId && (
+                                  <p className="text-xs text-green-600 dark:text-green-400">
+                                    SF: {guest.salesforceId.substring(0, 8)}...
+                                  </p>
+                                )}
                               </div>
                             </div>
 
@@ -649,19 +634,19 @@ export default function CheckInPage() {
                               <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div>
                                   <p className="font-medium">Room</p>
-                                  <p>{guest.room}</p>
+                                  <p>{guest.roomNumber}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium">Check-In</p>
-                                  <p>{formatDate(guest.checkIn)}</p>
+                                  <p>{formatDate(guest.checkInDate)}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium">Check-Out</p>
-                                  <p>{formatDate(guest.checkOut)}</p>
+                                  <p>{formatDate(guest.checkOutDate)}</p>
                                 </div>
                                 <div>
                                   <p className="font-medium">Duration</p>
-                                  <p>{calculateDuration(guest.checkIn, guest.checkOut)}</p>
+                                  <p>{calculateDuration(guest.checkInDate, guest.checkOutDate)}</p>
                                 </div>
                               </div>
 
@@ -680,6 +665,7 @@ export default function CheckInPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
       <Toaster />
     </div>
   )

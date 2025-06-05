@@ -2,162 +2,112 @@
 
 import type React from "react"
 
+import {
+  LayoutDashboard,
+  Settings,
+  ListChecks,
+  User2,
+  Calendar,
+  Bell,
+  HelpCircle,
+  CreditCard,
+  Lock,
+} from "lucide-react"
+
+export const ownerNavigation = [
+  {
+    title: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    title: "Setup",
+    href: "/setup",
+    icon: Settings,
+  },
+  {
+    title: "Tasks",
+    href: "/tasks",
+    icon: ListChecks,
+  },
+  {
+    title: "Users",
+    href: "/users",
+    icon: User2,
+  },
+  {
+    title: "Billing",
+    href: "/billing",
+    icon: CreditCard,
+  },
+]
+
+export const generalNavigation = [
+  {
+    title: "Calendar",
+    href: "/calendar",
+    icon: Calendar,
+  },
+  {
+    title: "Notifications",
+    href: "/notifications",
+    icon: Bell,
+  },
+  {
+    title: "Profile",
+    href: "/profile",
+    icon: User2,
+  },
+  {
+    title: "Security",
+    href: "/security",
+    icon: Lock,
+  },
+  {
+    title: "Help",
+    href: "/help",
+    icon: HelpCircle,
+  },
+]
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-import { Button } from "@/components/ui/button"
-import { ModeToggle } from "@/components/mode-toggle"
-import { LogOut, Shield, Menu, X } from "lucide-react"
-import { useState } from "react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
-interface SidebarProps {
-  items: {
-    name: string
+interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  navigation: Array<{
+    title: string
     href: string
-    icon: React.ReactNode
-    roles?: string[]
-  }[]
+    icon: React.ComponentType<{ className?: string }>
+  }>
 }
 
-const Sidebar = ({ items }: SidebarProps) => {
-  const { user, role, logout } = useAuth()
+export default function Sidebar({ className, navigation, ...props }: SidebarProps) {
   const pathname = usePathname()
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
-  const isActive = (path: string) => {
-    return pathname === path || pathname.startsWith(`${path}/`)
-  }
-
-  const filteredItems = items.filter((item) => !item.roles || item.roles.includes(role as "owner" | "receptionist"))
 
   return (
-    <>
-      {/* Desktop Sidebar */}
-      <div className="hidden md:flex w-64 flex-col fixed inset-y-0 z-50">
-        <div className="flex flex-col h-full border-r bg-background">
-          <div className="p-4 flex items-center gap-2">
-            <Shield className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold">Security System</h1>
-          </div>
-
-          <Separator />
-
-          <div className="flex-1 overflow-auto py-2">
-            <nav className="grid gap-1 px-2">
-              {filteredItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    isActive(item.href)
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-accent hover:text-accent-foreground"
-                  }`}
-                >
-                  {item.icon}
-                  {item.name}
+    <div className={cn("pb-12", className)} {...props}>
+      <div className="space-y-4 py-4">
+        <div className="px-3 py-2">
+          <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">Navigation</h2>
+          <div className="space-y-1">
+            {navigation.map((item) => (
+              <Button
+                key={item.href}
+                variant={pathname === item.href ? "secondary" : "ghost"}
+                className="w-full justify-start"
+                asChild
+              >
+                <Link href={item.href}>
+                  <item.icon className="mr-2 h-4 w-4" />
+                  {item.title}
                 </Link>
-              ))}
-            </nav>
-          </div>
-
-          <div className="p-4 mt-auto">
-            <div className="flex items-center gap-3 mb-4">
-              <Avatar>
-                <AvatarImage src={user?.avatar || "/placeholder.svg"} />
-                <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-sm font-medium">{user?.name}</p>
-                <p className="text-xs text-muted-foreground capitalize">{role}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="w-full" onClick={logout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
               </Button>
-              <ModeToggle />
-            </div>
+            ))}
           </div>
         </div>
       </div>
-
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-background border-b h-14 flex items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <Shield className="h-6 w-6 text-primary" />
-          <h1 className="text-lg font-bold">Security System</h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <ModeToggle />
-          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0">
-              <div className="flex flex-col h-full">
-                <div className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-6 w-6 text-primary" />
-                    <h1 className="text-xl font-bold">Security System</h1>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
-
-                <Separator />
-
-                <div className="flex-1 overflow-auto py-2">
-                  <nav className="grid gap-1 px-2">
-                    {filteredItems.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                          isActive(item.href)
-                            ? "bg-accent text-accent-foreground"
-                            : "hover:bg-accent hover:text-accent-foreground"
-                        }`}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        {item.icon}
-                        {item.name}
-                      </Link>
-                    ))}
-                  </nav>
-                </div>
-
-                <div className="p-4 mt-auto">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Avatar>
-                      <AvatarImage src={user?.avatar || "/placeholder.svg"} />
-                      <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{user?.name}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{role}</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full" onClick={logout}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-      </div>
-    </>
+    </div>
   )
 }
-
-export default Sidebar

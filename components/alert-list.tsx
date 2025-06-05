@@ -15,77 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { AlertTriangle, CheckCircle, AlertOctagon, ArrowUpRight, MessageSquare } from "lucide-react"
-
-interface Alert {
-  id: string
-  faceImage: string
-  roomId: string
-  roomName: string
-  type: "intruder" | "suspicious" | "unauthorized" | "system"
-  timestamp: string
-  status: "pending" | "resolved" | "escalated"
-  receptionist: string | null
-  comments: string[]
-}
-
-const alerts: Alert[] = [
-  {
-    id: "A001",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "R003",
-    roomName: "Office 101",
-    type: "intruder",
-    timestamp: "2 minutes ago",
-    status: "pending",
-    receptionist: null,
-    comments: [],
-  },
-  {
-    id: "A002",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "R002",
-    roomName: "Conference Room A",
-    type: "suspicious",
-    timestamp: "15 minutes ago",
-    status: "escalated",
-    receptionist: "Sarah",
-    comments: ["This person has been loitering for over 30 minutes"],
-  },
-  {
-    id: "A003",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "R004",
-    roomName: "Storage Room",
-    type: "unauthorized",
-    timestamp: "32 minutes ago",
-    status: "resolved",
-    receptionist: "John",
-    comments: ["False alarm, this was a new maintenance worker"],
-  },
-  {
-    id: "A004",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "R001",
-    roomName: "Main Lobby",
-    type: "suspicious",
-    timestamp: "1 hour ago",
-    status: "pending",
-    receptionist: null,
-    comments: [],
-  },
-  {
-    id: "A005",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "R005",
-    roomName: "Conference Room B",
-    type: "system",
-    timestamp: "2 hours ago",
-    status: "resolved",
-    receptionist: "Sarah",
-    comments: ["Camera was temporarily offline, now back online"],
-  },
-]
+import { AlertTriangle, CheckCircle, AlertOctagon, ArrowUpRight, MessageSquare, Inbox } from "lucide-react"
+import { useData } from "@/contexts/data-context"
 
 interface AlertListProps {
   status?: string | null
@@ -96,26 +27,27 @@ interface AlertListProps {
 
 export function AlertList({ status, type, room, receptionist }: AlertListProps) {
   const { role } = useAuth()
-  const [alertsData, setAlertsData] = useState<Alert[]>(alerts)
-  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
+  const { alerts, resolveAlert } = useData()
+  const [selectedAlert, setSelectedAlert] = useState<any>(null)
   const [comment, setComment] = useState("")
   const [selectedReceptionist, setSelectedReceptionist] = useState<string>("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [dialogAction, setDialogAction] = useState<"comment" | "escalate" | "resolve" | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const filteredAlerts = alertsData.filter((alert) => {
+  const filteredAlerts = alerts.filter((alert) => {
     if (status && alert.status !== status) return false
     if (type && alert.type !== type) return false
-    if (room && alert.roomId !== room) return false
-    if (receptionist && alert.receptionist !== receptionist) return false
+    if (room && alert.location !== room) return false
+    if (receptionist && alert.assignedTo !== receptionist) return false
     return true
   })
 
-  const handleOpenDialog = (alert: Alert, action: "comment" | "escalate" | "resolve") => {
+  const handleOpenDialog = (alert: any, action: "comment" | "escalate" | "resolve") => {
     setSelectedAlert(alert)
     setDialogAction(action)
     setComment("")
-    setSelectedReceptionist(alert.receptionist || "")
+    setSelectedReceptionist(alert.assignedTo || "")
     setIsDialogOpen(true)
   }
 
@@ -130,89 +62,88 @@ export function AlertList({ status, type, room, receptionist }: AlertListProps) 
   const handleAddComment = () => {
     if (!selectedAlert || !comment.trim()) return
 
-    setAlertsData((prev) =>
-      prev.map((alert) =>
-        alert.id === selectedAlert.id ? { ...alert, comments: [...alert.comments, comment.trim()] } : alert,
-      ),
-    )
+    setIsSubmitting(true)
 
-    handleCloseDialog()
+    // Simulate API call
+    setTimeout(() => {
+      // Update the alert with the new comment
+      // This would be handled by the data context in a real implementation
+      setIsSubmitting(false)
+      handleCloseDialog()
+    }, 1000)
   }
 
   const handleEscalate = () => {
     if (!selectedAlert) return
 
-    setAlertsData((prev) =>
-      prev.map((alert) =>
-        alert.id === selectedAlert.id
-          ? {
-              ...alert,
-              status: "escalated",
-              receptionist: selectedReceptionist || alert.receptionist,
-              comments: comment.trim() ? [...alert.comments, comment.trim()] : alert.comments,
-            }
-          : alert,
-      ),
-    )
+    setIsSubmitting(true)
 
-    handleCloseDialog()
+    // Simulate API call
+    setTimeout(() => {
+      // Update the alert status to escalated
+      // This would be handled by the data context in a real implementation
+      setIsSubmitting(false)
+      handleCloseDialog()
+    }, 1000)
   }
 
   const handleResolve = () => {
     if (!selectedAlert) return
 
-    setAlertsData((prev) =>
-      prev.map((alert) =>
-        alert.id === selectedAlert.id
-          ? {
-              ...alert,
-              status: "resolved",
-              receptionist: selectedReceptionist || alert.receptionist,
-              comments: comment.trim() ? [...alert.comments, comment.trim()] : alert.comments,
-            }
-          : alert,
-      ),
-    )
+    setIsSubmitting(true)
 
-    handleCloseDialog()
+    // Call the resolveAlert function from the data context
+    resolveAlert(selectedAlert.id, comment).then(() => {
+      setIsSubmitting(false)
+      handleCloseDialog()
+    })
   }
 
-  const getTypeLabel = (type: Alert["type"]) => {
+  const getTypeLabel = (type: string) => {
     switch (type) {
-      case "intruder":
+      case "Intruder":
         return "Intruder"
-      case "suspicious":
-        return "Suspicious Activity"
-      case "unauthorized":
-        return "Unauthorized Access"
-      case "system":
-        return "System Alert"
+      case "Mismatch":
+        return "Face Mismatch"
+      case "Tailgating":
+        return "Tailgating"
+      default:
+        return type
     }
   }
 
-  const getStatusBadge = (status: Alert["status"]) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case "pending":
+      case "Open":
         return (
           <Badge variant="destructive">
             <AlertTriangle className="h-3 w-3 mr-1" />
-            Pending
+            Open
           </Badge>
         )
-      case "resolved":
+      case "Resolved":
         return (
           <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
             <CheckCircle className="h-3 w-3 mr-1" />
             Resolved
           </Badge>
         )
-      case "escalated":
+      case "Escalated":
         return (
           <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">
             <AlertOctagon className="h-3 w-3 mr-1" />
             Escalated
           </Badge>
         )
+      case "Responded":
+        return (
+          <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+            <MessageSquare className="h-3 w-3 mr-1" />
+            Responded
+          </Badge>
+        )
+      default:
+        return <Badge variant="outline">{status}</Badge>
     }
   }
 
@@ -255,92 +186,107 @@ export function AlertList({ status, type, room, receptionist }: AlertListProps) 
     }
   }
 
+  // If there are no alerts, show an empty state
+  if (filteredAlerts.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <Inbox className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium mb-2">No alerts found</h3>
+        <p className="text-muted-foreground mb-6">
+          {status || type || room || receptionist
+            ? "No alerts match your current filters"
+            : "There are no security alerts to display"}
+        </p>
+        <Button onClick={() => window.location.reload()}>Refresh</Button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      {filteredAlerts.length === 0 ? (
-        <div className="text-center py-10 text-muted-foreground">No alerts match the current filters</div>
-      ) : (
-        filteredAlerts.map((alert) => (
-          <Card key={alert.id} className="overflow-hidden">
-            <CardContent className="p-0">
-              <div className="flex flex-col md:flex-row">
-                <div className="w-full md:w-24 h-24 bg-muted flex items-center justify-center">
-                  <img
-                    src={alert.faceImage || "/placeholder.svg"}
-                    alt="Face Detection"
-                    className="h-full w-full object-cover"
-                  />
+      {filteredAlerts.map((alert) => (
+        <Card key={alert.id} className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="flex flex-col md:flex-row">
+              <div className="w-full md:w-24 h-24 bg-muted flex items-center justify-center">
+                <img
+                  src={alert.faceImageUrl || "/placeholder.svg?height=80&width=80"}
+                  alt="Face Detection"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="flex-1 p-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 mb-2 md:mb-0">
+                    <h3 className="font-medium">{alert.id}</h3>
+                    {getStatusBadge(alert.status)}
+                    <Badge variant="outline">{getTypeLabel(alert.type)}</Badge>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {alert.location} | {alert.timestamp.toLocaleString()}
+                  </div>
                 </div>
-                <div className="flex-1 p-4">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 mb-2 md:mb-0">
-                      <h3 className="font-medium">{alert.id}</h3>
-                      {getStatusBadge(alert.status)}
-                      <Badge variant="outline">{getTypeLabel(alert.type)}</Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground">{alert.timestamp}</div>
-                  </div>
 
-                  <div className="mb-4">
+                <div className="mb-4">
+                  <p className="text-sm">
+                    <span className="font-medium">Description:</span> {alert.description}
+                  </p>
+                  {alert.assignedTo && (
                     <p className="text-sm">
-                      <span className="font-medium">Room:</span> {alert.roomName} ({alert.roomId})
+                      <span className="font-medium">Assigned to:</span> {alert.assignedTo}
                     </p>
-                    {alert.receptionist && (
-                      <p className="text-sm">
-                        <span className="font-medium">Assigned to:</span> {alert.receptionist}
-                      </p>
-                    )}
-                  </div>
+                  )}
+                </div>
 
-                  {alert.comments.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium mb-1">Comments:</h4>
-                      <ul className="text-sm space-y-1">
-                        {alert.comments.map((comment, index) => (
-                          <li key={index} className="bg-muted p-2 rounded-md">
-                            {comment}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                {alert.receptionistComment && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium">Receptionist Comment:</p>
+                    <p className="text-sm bg-muted p-2 rounded-md">{alert.receptionistComment}</p>
+                  </div>
+                )}
+
+                {alert.ownerReview && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium">Owner Review:</p>
+                    <p className="text-sm bg-muted p-2 rounded-md">{alert.ownerReview}</p>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleOpenDialog(alert, "comment")}>
+                    <MessageSquare className="h-4 w-4 mr-1" />
+                    Add Comment
+                  </Button>
+
+                  {alert.status !== "Escalated" && alert.status !== "Resolved" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-amber-500 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
+                      onClick={() => handleOpenDialog(alert, "escalate")}
+                    >
+                      <ArrowUpRight className="h-4 w-4 mr-1" />
+                      Escalate
+                    </Button>
                   )}
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleOpenDialog(alert, "comment")}>
-                      <MessageSquare className="h-4 w-4 mr-1" />
-                      Add Comment
+                  {alert.status !== "Resolved" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-green-500 text-green-500 hover:bg-green-50 dark:hover:bg-green-950"
+                      onClick={() => handleOpenDialog(alert, "resolve")}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Mark as Resolved
                     </Button>
-
-                    {alert.status !== "escalated" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-amber-500 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
-                        onClick={() => handleOpenDialog(alert, "escalate")}
-                      >
-                        <ArrowUpRight className="h-4 w-4 mr-1" />
-                        Escalate
-                      </Button>
-                    )}
-
-                    {alert.status !== "resolved" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-green-500 text-green-500 hover:bg-green-50 dark:hover:bg-green-950"
-                        onClick={() => handleOpenDialog(alert, "resolve")}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Mark as Resolved
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))
-      )}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
@@ -357,8 +303,8 @@ export function AlertList({ status, type, room, receptionist }: AlertListProps) 
                   <p className="text-sm">{selectedAlert.id}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Room</label>
-                  <p className="text-sm">{selectedAlert.roomName}</p>
+                  <label className="text-sm font-medium">Location</label>
+                  <p className="text-sm">{selectedAlert.location}</p>
                 </div>
               </div>
 
@@ -389,14 +335,14 @@ export function AlertList({ status, type, room, receptionist }: AlertListProps) 
             <Button variant="outline" onClick={handleCloseDialog}>
               Cancel
             </Button>
-            <Button onClick={getDialogAction()}>
-              {dialogAction === "comment"
-                ? "Add Comment"
-                : dialogAction === "escalate"
-                  ? "Escalate"
-                  : dialogAction === "resolve"
-                    ? "Resolve"
-                    : "Submit"}
+            <Button onClick={getDialogAction()} disabled={isSubmitting}>
+              {isSubmitting
+                ? "Processing..."
+                : dialogAction === "comment"
+                  ? "Add Comment"
+                  : dialogAction === "escalate"
+                    ? "Escalate"
+                    : "Resolve"}
             </Button>
           </DialogFooter>
         </DialogContent>

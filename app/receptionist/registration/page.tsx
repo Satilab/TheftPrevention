@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,12 +11,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Camera, Upload, RefreshCw, Save, CheckCircle } from "lucide-react"
+import { Camera, Upload, RefreshCw, Save, CheckCircle, AlertCircle } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
+import { useData } from "@/contexts/data-context"
 
 export default function RegistrationPage() {
   const { toast } = useToast()
+  const { addGuest, addStaff, isConnectedToSalesforce } = useData()
   const [activeTab, setActiveTab] = useState("camera")
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [name, setName] = useState("")
@@ -27,6 +29,7 @@ export default function RegistrationPage() {
   const [assignRoom, setAssignRoom] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [salesforceId, setSalesforceId] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -40,6 +43,11 @@ export default function RegistrationPage() {
       }
     } catch (err) {
       console.error("Error accessing camera:", err)
+      toast({
+        title: "Camera Error",
+        description: "Could not access camera. Please check permissions.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -84,21 +92,57 @@ export default function RegistrationPage() {
     setIdNumber("")
     setAssignRoom(true)
     setShowSuccess(false)
+    setSalesforceId(null)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Create a unique ID for the photo URL (in a real app, you'd upload to a storage service)
+      const photoId = `photo_${Date.now()}`
+      const photoUrl = capturedImage || `/placeholder.svg?height=200&width=200&query=${encodeURIComponent(name)}`
+
+      if (role === "guest") {
+        // Register as guest
+        await addGuest({
+          name,
+          roomNumber: assignRoom ? roomNumber : undefined,
+          status: "not-arrived",
+          photoUrl,
+          idProof: `${idType}: ${idNumber}`,
+          checkInDate: undefined, // Will be set during check-in
+          checkOutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], // Default 7 days
+        })
+      } else {
+        // Register as staff
+        await addStaff({
+          name,
+          role: "Receptionist", // Default role
+          photoUrl,
+          shiftStart: "09:00",
+          shiftEnd: "17:00",
+        })
+      }
+
       setIsSubmitting(false)
       setShowSuccess(true)
+
       toast({
         title: "Registration Successful",
-        description: `${role === "guest" ? "Guest" : "Staff member"} ${name} has been registered successfully.`,
+        description: `${role === "guest" ? "Guest" : "Staff member"} ${name} has been registered successfully${isConnectedToSalesforce ? " and synced to Salesforce" : ""}.`,
       })
-    }, 1500)
+    } catch (error) {
+      console.error("Registration error:", error)
+      setIsSubmitting(false)
+
+      toast({
+        title: "Registration Failed",
+        description: `Failed to register ${role === "guest" ? "guest" : "staff member"}. ${error instanceof Error ? error.message : "Please try again."}`,
+        variant: "destructive",
+      })
+    }
   }
 
   // Start camera when tab changes to camera
@@ -112,17 +156,23 @@ export default function RegistrationPage() {
   }
 
   // Clean up camera on unmount
-  useState(() => {
+  useEffect(() => {
     return () => {
       stopCamera()
     }
-  })
+  }, [])
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Guest & Staff Registration</h1>
         <p className="text-muted-foreground">Register new guests or staff members with photo identification</p>
+        {!isConnectedToSalesforce && (
+          <div className="mt-2 flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm">Not connected to Salesforce. Changes will only be saved locally.</span>
+          </div>
+        )}
       </div>
 
       <Card className="max-w-2xl mx-auto">
@@ -137,6 +187,11 @@ export default function RegistrationPage() {
                 {role === "guest" ? "Guest" : "Staff member"} {name} has been successfully registered
                 {assignRoom && roomNumber ? ` and assigned to Room ${roomNumber}` : ""}.
               </p>
+              {isConnectedToSalesforce && (
+                <p className="text-sm text-center text-green-600 dark:text-green-400">
+                  Successfully synced to Salesforce
+                </p>
+              )}
               <Button onClick={resetForm} className="mt-4">
                 Register Another
               </Button>
@@ -295,9 +350,7 @@ export default function RegistrationPage() {
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={
-                  isSubmitting || !capturedImage || !name || !idType || !idNumber || (assignRoom && !roomNumber)
-                }
+                disabled={isSubmitting || !name || !idType || !idNumber || (assignRoom && !roomNumber)}
               >
                 {isSubmitting ? (
                   <>

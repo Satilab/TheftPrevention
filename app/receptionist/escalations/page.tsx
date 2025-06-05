@@ -18,172 +18,108 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { Toaster } from "@/components/ui/toaster"
-
-// Mock escalation data
-const escalationData = [
-  {
-    id: "E001",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "101",
-    alertType: "unregistered",
-    timestamp: "2023-05-29T14:30:00",
-    status: "pending",
-    ownerNote: "This person was not registered but entered Room 101. Please verify identity.",
-    response: "",
-  },
-  {
-    id: "E002",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "203",
-    alertType: "suspicious",
-    timestamp: "2023-05-29T15:45:00",
-    status: "responded",
-    ownerNote: "Person loitering in hallway near Room 203 for over 30 minutes.",
-    response: "This was a hotel maintenance worker fixing the AC units. I've verified their ID badge.",
-  },
-  {
-    id: "E003",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "305",
-    alertType: "wrong-room",
-    timestamp: "2023-05-28T12:15:00",
-    status: "reviewed",
-    ownerNote: "Guest from Room 302 entered Room 305. Please check if this was authorized.",
-    response: "Guest was confused about their room number. I've escorted them to the correct room.",
-  },
-  {
-    id: "E004",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "402",
-    alertType: "late-entry",
-    timestamp: "2023-05-28T23:20:00",
-    status: "pending",
-    ownerNote: "Guest entered hotel after midnight without checking in at reception.",
-    response: "",
-  },
-  {
-    id: "E005",
-    faceImage: "/placeholder.svg?height=80&width=80",
-    roomId: "204",
-    alertType: "multiple-rooms",
-    timestamp: "2023-05-27T13:20:00",
-    status: "reviewed",
-    ownerNote: "Same person detected in Rooms 204 and 206 within 5 minutes.",
-    response: "This was the housekeeping staff cleaning both rooms. Schedule verified.",
-  },
-]
-
-type EscalationStatus = "pending" | "responded" | "reviewed"
-type AlertType = "unregistered" | "suspicious" | "wrong-room" | "late-entry" | "multiple-rooms" | "tailgating"
-
-interface Escalation {
-  id: string
-  faceImage: string
-  roomId: string
-  alertType: AlertType
-  timestamp: string
-  status: EscalationStatus
-  ownerNote: string
-  response: string
-}
+import { useData } from "@/contexts/data-context"
 
 export default function EscalationsPage() {
   const { toast } = useToast()
-  const [escalations, setEscalations] = useState<Escalation[]>(escalationData)
+  const { alerts, updateAlert, isConnectedToSalesforce } = useData()
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedEscalation, setSelectedEscalation] = useState<Escalation | null>(null)
+  const [selectedEscalation, setSelectedEscalation] = useState<string | null>(null)
   const [responseText, setResponseText] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [processingAlerts, setProcessingAlerts] = useState<Record<string, boolean>>({})
 
-  const filteredEscalations = escalations.filter(
-    (escalation) =>
-      escalation.roomId.includes(searchQuery) ||
-      escalation.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      getAlertTypeLabel(escalation.alertType).toLowerCase().includes(searchQuery.toLowerCase()),
+  const filteredEscalations = alerts.filter(
+    (alert) =>
+      (alert.location && alert.location.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      alert.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (alert.type && alert.type.toLowerCase().includes(searchQuery.toLowerCase())),
   )
 
-  const handleSubmitResponse = (escalation: Escalation) => {
+  const handleSubmitResponse = async (alertId: string) => {
     if (!responseText.trim()) return
 
+    setProcessingAlerts((prev) => ({ ...prev, [alertId]: true }))
     setIsSubmitting(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      setEscalations((prev) =>
-        prev.map((e) =>
-          e.id === escalation.id
-            ? {
-                ...e,
-                status: "responded",
-                response: responseText.trim(),
-              }
-            : e,
-        ),
-      )
-      setIsSubmitting(false)
+    try {
+      console.log("🔄 Submitting response for alert:", alertId)
+
+      // Update the alert with the response - use "Responded" instead of "responded"
+      await updateAlert(alertId, {
+        status: "Responded",
+        receptionistComment: responseText.trim(),
+      })
+
       setSelectedEscalation(null)
       setResponseText("")
 
       toast({
         title: "Response Submitted",
-        description: `Your response to escalation ${escalation.id} has been submitted.`,
+        description: `Your response to escalation ${alertId} has been submitted${isConnectedToSalesforce ? " and synced to Salesforce" : ""}.`,
       })
-    }, 1500)
+    } catch (error) {
+      console.error("❌ Response submission error:", error)
+      toast({
+        title: "Submission Failed",
+        description: `Failed to submit response. ${error instanceof Error ? error.message : "Please try again."}`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+      setProcessingAlerts((prev) => ({ ...prev, [alertId]: false }))
+    }
   }
 
-  const getAlertTypeLabel = (type: AlertType) => {
+  const getAlertTypeLabel = (type: string) => {
     switch (type) {
-      case "unregistered":
+      case "Intruder":
         return "Unregistered Face"
-      case "suspicious":
+      case "Mismatch":
         return "Suspicious Activity"
-      case "wrong-room":
-        return "Wrong Room Entry"
-      case "late-entry":
-        return "Late Entry"
-      case "multiple-rooms":
-        return "Multiple Room Access"
-      case "tailgating":
+      case "Tailgating":
         return "Tailgating"
+      default:
+        return type
     }
   }
 
-  const getAlertTypeIcon = (type: AlertType) => {
+  const getAlertTypeIcon = (type: string) => {
     switch (type) {
-      case "unregistered":
-      case "wrong-room":
+      case "Intruder":
         return <AlertTriangle className="h-5 w-5 text-red-500" />
-      case "suspicious":
-      case "tailgating":
+      case "Mismatch":
         return <AlertCircle className="h-5 w-5 text-amber-500" />
-      case "late-entry":
-      case "multiple-rooms":
+      case "Tailgating":
         return <Clock className="h-5 w-5 text-blue-500" />
+      default:
+        return <AlertCircle className="h-5 w-5 text-amber-500" />
     }
   }
 
-  const getStatusBadge = (status: EscalationStatus) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case "pending":
+      case "Open":
         return <Badge variant="destructive">Pending</Badge>
-      case "responded":
+      case "Responded":
         return (
           <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
             Responded
           </Badge>
         )
-      case "reviewed":
+      case "Resolved":
         return (
           <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
             Reviewed
           </Badge>
         )
+      default:
+        return <Badge variant="outline">{status}</Badge>
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString()
+  const formatDate = (date: Date) => {
+    return date.toLocaleString()
   }
 
   return (
@@ -191,6 +127,12 @@ export default function EscalationsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Escalation Inbox</h1>
         <p className="text-muted-foreground">Manage and respond to security alerts assigned to you</p>
+        {!isConnectedToSalesforce && (
+          <div className="mt-2 flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm">Not connected to Salesforce. Changes will only be saved locally.</span>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
@@ -204,7 +146,7 @@ export default function EscalationsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Button variant="outline">
+        <Button variant="outline" onClick={() => window.location.reload()}>
           <RefreshCw className="mr-2 h-4 w-4" />
           Refresh
         </Button>
@@ -213,9 +155,9 @@ export default function EscalationsPage() {
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
           <TabsTrigger value="all">All Escalations</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="responded">Responded</TabsTrigger>
-          <TabsTrigger value="reviewed">Reviewed</TabsTrigger>
+          <TabsTrigger value="Open">Pending</TabsTrigger>
+          <TabsTrigger value="Responded">Responded</TabsTrigger>
+          <TabsTrigger value="Resolved">Reviewed</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all">
@@ -238,7 +180,11 @@ export default function EscalationsPage() {
                         <div className="flex flex-col md:flex-row">
                           <div className="w-full md:w-32 h-32 bg-muted flex items-center justify-center">
                             <img
-                              src={escalation.faceImage || "/placeholder.svg"}
+                              src={
+                                escalation.faceLogId
+                                  ? `/placeholder.svg?height=128&width=128&query=face`
+                                  : "/placeholder.svg"
+                              }
                               alt="Face Detection"
                               className="h-full w-full object-cover"
                             />
@@ -247,31 +193,36 @@ export default function EscalationsPage() {
                             <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
                               <div className="flex items-center gap-2 mb-2 md:mb-0">
                                 <div className="flex items-center">
-                                  {getAlertTypeIcon(escalation.alertType)}
+                                  {getAlertTypeIcon(escalation.type)}
                                   <h3 className="font-medium ml-2">{escalation.id}</h3>
                                 </div>
                                 {getStatusBadge(escalation.status)}
-                                <Badge variant="outline">{getAlertTypeLabel(escalation.alertType)}</Badge>
+                                <Badge variant="outline">{getAlertTypeLabel(escalation.type)}</Badge>
+                                {escalation.salesforceId && (
+                                  <Badge variant="outline" className="bg-green-100 text-green-800">
+                                    SF
+                                  </Badge>
+                                )}
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                Room {escalation.roomId} | {formatDate(escalation.timestamp)}
+                                {escalation.location} | {formatDate(escalation.timestamp)}
                               </div>
                             </div>
 
                             <div className="mb-4">
-                              <p className="text-sm font-medium">Owner's Note:</p>
-                              <p className="text-sm bg-muted p-2 rounded-md">{escalation.ownerNote}</p>
+                              <p className="text-sm font-medium">Description:</p>
+                              <p className="text-sm bg-muted p-2 rounded-md">{escalation.description}</p>
                             </div>
 
-                            {escalation.response && (
+                            {escalation.receptionistComment && (
                               <div className="mb-4">
                                 <p className="text-sm font-medium">Your Response:</p>
-                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.response}</p>
+                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.receptionistComment}</p>
                               </div>
                             )}
 
                             <div className="flex flex-wrap gap-2">
-                              {escalation.status === "pending" ? (
+                              {escalation.status === "Open" ? (
                                 <Dialog>
                                   <DialogTrigger asChild>
                                     <Button>
@@ -293,12 +244,12 @@ export default function EscalationsPage() {
                                           <p className="text-sm">{escalation.id}</p>
                                         </div>
                                         <div>
-                                          <p className="text-sm font-medium">Room</p>
-                                          <p className="text-sm">{escalation.roomId}</p>
+                                          <p className="text-sm font-medium">Location</p>
+                                          <p className="text-sm">{escalation.location}</p>
                                         </div>
                                         <div>
                                           <p className="text-sm font-medium">Alert Type</p>
-                                          <p className="text-sm">{getAlertTypeLabel(escalation.alertType)}</p>
+                                          <p className="text-sm">{getAlertTypeLabel(escalation.type)}</p>
                                         </div>
                                         <div>
                                           <p className="text-sm font-medium">Timestamp</p>
@@ -326,10 +277,10 @@ export default function EscalationsPage() {
                                     </div>
                                     <DialogFooter>
                                       <Button
-                                        onClick={() => handleSubmitResponse(escalation)}
+                                        onClick={() => handleSubmitResponse(escalation.id)}
                                         disabled={isSubmitting || !responseText.trim()}
                                       >
-                                        {isSubmitting ? (
+                                        {processingAlerts[escalation.id] ? (
                                           <>
                                             <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                                             Submitting...
@@ -346,7 +297,7 @@ export default function EscalationsPage() {
                                 </Dialog>
                               ) : (
                                 <Button variant="outline" disabled>
-                                  {escalation.status === "responded" ? (
+                                  {escalation.status === "Responded" ? (
                                     <>
                                       <Clock className="mr-2 h-4 w-4" />
                                       Awaiting Review
@@ -371,7 +322,7 @@ export default function EscalationsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="pending">
+        <TabsContent value="Open">
           <Card>
             <CardHeader>
               <CardTitle>Pending Escalations</CardTitle>
@@ -379,21 +330,25 @@ export default function EscalationsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredEscalations.filter((e) => e.status === "pending").length === 0 ? (
+                {filteredEscalations.filter((e) => e.status === "Open").length === 0 ? (
                   <div className="text-center py-10 text-muted-foreground">
                     <CheckCircle className="mx-auto h-10 w-10 mb-2" />
                     <p>No pending escalations</p>
                   </div>
                 ) : (
                   filteredEscalations
-                    .filter((e) => e.status === "pending")
+                    .filter((e) => e.status === "Open")
                     .map((escalation) => (
                       <Card key={escalation.id} className="overflow-hidden">
                         <CardContent className="p-0">
                           <div className="flex flex-col md:flex-row">
                             <div className="w-full md:w-32 h-32 bg-muted flex items-center justify-center">
                               <img
-                                src={escalation.faceImage || "/placeholder.svg"}
+                                src={
+                                  escalation.faceLogId
+                                    ? `/placeholder.svg?height=128&width=128&query=face`
+                                    : "/placeholder.svg"
+                                }
                                 alt="Face Detection"
                                 className="h-full w-full object-cover"
                               />
@@ -402,20 +357,25 @@ export default function EscalationsPage() {
                               <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
                                 <div className="flex items-center gap-2 mb-2 md:mb-0">
                                   <div className="flex items-center">
-                                    {getAlertTypeIcon(escalation.alertType)}
+                                    {getAlertTypeIcon(escalation.type)}
                                     <h3 className="font-medium ml-2">{escalation.id}</h3>
                                   </div>
                                   {getStatusBadge(escalation.status)}
-                                  <Badge variant="outline">{getAlertTypeLabel(escalation.alertType)}</Badge>
+                                  <Badge variant="outline">{getAlertTypeLabel(escalation.type)}</Badge>
+                                  {escalation.salesforceId && (
+                                    <Badge variant="outline" className="bg-green-100 text-green-800">
+                                      SF
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  Room {escalation.roomId} | {formatDate(escalation.timestamp)}
+                                  {escalation.location} | {formatDate(escalation.timestamp)}
                                 </div>
                               </div>
 
                               <div className="mb-4">
-                                <p className="text-sm font-medium">Owner's Note:</p>
-                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.ownerNote}</p>
+                                <p className="text-sm font-medium">Description:</p>
+                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.description}</p>
                               </div>
 
                               <div className="flex flex-wrap gap-2">
@@ -440,12 +400,12 @@ export default function EscalationsPage() {
                                           <p className="text-sm">{escalation.id}</p>
                                         </div>
                                         <div>
-                                          <p className="text-sm font-medium">Room</p>
-                                          <p className="text-sm">{escalation.roomId}</p>
+                                          <p className="text-sm font-medium">Location</p>
+                                          <p className="text-sm">{escalation.location}</p>
                                         </div>
                                         <div>
                                           <p className="text-sm font-medium">Alert Type</p>
-                                          <p className="text-sm">{getAlertTypeLabel(escalation.alertType)}</p>
+                                          <p className="text-sm">{getAlertTypeLabel(escalation.type)}</p>
                                         </div>
                                         <div>
                                           <p className="text-sm font-medium">Timestamp</p>
@@ -473,10 +433,10 @@ export default function EscalationsPage() {
                                     </div>
                                     <DialogFooter>
                                       <Button
-                                        onClick={() => handleSubmitResponse(escalation)}
+                                        onClick={() => handleSubmitResponse(escalation.id)}
                                         disabled={isSubmitting || !responseText.trim()}
                                       >
-                                        {isSubmitting ? (
+                                        {processingAlerts[escalation.id] ? (
                                           <>
                                             <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                                             Submitting...
@@ -503,28 +463,33 @@ export default function EscalationsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="responded">
+        <TabsContent value="Responded">
           <Card>
             <CardHeader>
               <CardTitle>Responded Escalations</CardTitle>
-              <CardDescription>Alerts you've responded to that are awaiting owner review</CardDescription>
+              <CardDescription>Alerts that have been responded to</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredEscalations.filter((e) => e.status === "responded").length === 0 ? (
+                {filteredEscalations.filter((e) => e.status === "Responded").length === 0 ? (
                   <div className="text-center py-10 text-muted-foreground">
+                    <AlertCircle className="mx-auto h-10 w-10 mb-2" />
                     <p>No responded escalations</p>
                   </div>
                 ) : (
                   filteredEscalations
-                    .filter((e) => e.status === "responded")
+                    .filter((e) => e.status === "Responded")
                     .map((escalation) => (
                       <Card key={escalation.id} className="overflow-hidden">
                         <CardContent className="p-0">
                           <div className="flex flex-col md:flex-row">
                             <div className="w-full md:w-32 h-32 bg-muted flex items-center justify-center">
                               <img
-                                src={escalation.faceImage || "/placeholder.svg"}
+                                src={
+                                  escalation.faceLogId
+                                    ? `/placeholder.svg?height=128&width=128&query=face`
+                                    : "/placeholder.svg"
+                                }
                                 alt="Face Detection"
                                 className="h-full w-full object-cover"
                               />
@@ -533,26 +498,33 @@ export default function EscalationsPage() {
                               <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
                                 <div className="flex items-center gap-2 mb-2 md:mb-0">
                                   <div className="flex items-center">
-                                    {getAlertTypeIcon(escalation.alertType)}
+                                    {getAlertTypeIcon(escalation.type)}
                                     <h3 className="font-medium ml-2">{escalation.id}</h3>
                                   </div>
                                   {getStatusBadge(escalation.status)}
-                                  <Badge variant="outline">{getAlertTypeLabel(escalation.alertType)}</Badge>
+                                  <Badge variant="outline">{getAlertTypeLabel(escalation.type)}</Badge>
+                                  {escalation.salesforceId && (
+                                    <Badge variant="outline" className="bg-green-100 text-green-800">
+                                      SF
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  Room {escalation.roomId} | {formatDate(escalation.timestamp)}
+                                  {escalation.location} | {formatDate(escalation.timestamp)}
                                 </div>
                               </div>
 
                               <div className="mb-4">
-                                <p className="text-sm font-medium">Owner's Note:</p>
-                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.ownerNote}</p>
+                                <p className="text-sm font-medium">Description:</p>
+                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.description}</p>
                               </div>
 
-                              <div className="mb-4">
-                                <p className="text-sm font-medium">Your Response:</p>
-                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.response}</p>
-                              </div>
+                              {escalation.receptionistComment && (
+                                <div className="mb-4">
+                                  <p className="text-sm font-medium">Your Response:</p>
+                                  <p className="text-sm bg-muted p-2 rounded-md">{escalation.receptionistComment}</p>
+                                </div>
+                              )}
 
                               <div className="flex flex-wrap gap-2">
                                 <Button variant="outline" disabled>
@@ -571,28 +543,33 @@ export default function EscalationsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="reviewed">
+        <TabsContent value="Resolved">
           <Card>
             <CardHeader>
               <CardTitle>Reviewed Escalations</CardTitle>
-              <CardDescription>Alerts that have been reviewed by the owner</CardDescription>
+              <CardDescription>Alerts that have been reviewed</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredEscalations.filter((e) => e.status === "reviewed").length === 0 ? (
+                {filteredEscalations.filter((e) => e.status === "Resolved").length === 0 ? (
                   <div className="text-center py-10 text-muted-foreground">
+                    <CheckCircle className="mx-auto h-10 w-10 mb-2" />
                     <p>No reviewed escalations</p>
                   </div>
                 ) : (
                   filteredEscalations
-                    .filter((e) => e.status === "reviewed")
+                    .filter((e) => e.status === "Resolved")
                     .map((escalation) => (
                       <Card key={escalation.id} className="overflow-hidden">
                         <CardContent className="p-0">
                           <div className="flex flex-col md:flex-row">
                             <div className="w-full md:w-32 h-32 bg-muted flex items-center justify-center">
                               <img
-                                src={escalation.faceImage || "/placeholder.svg"}
+                                src={
+                                  escalation.faceLogId
+                                    ? `/placeholder.svg?height=128&width=128&query=face`
+                                    : "/placeholder.svg"
+                                }
                                 alt="Face Detection"
                                 className="h-full w-full object-cover"
                               />
@@ -601,26 +578,33 @@ export default function EscalationsPage() {
                               <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
                                 <div className="flex items-center gap-2 mb-2 md:mb-0">
                                   <div className="flex items-center">
-                                    {getAlertTypeIcon(escalation.alertType)}
+                                    {getAlertTypeIcon(escalation.type)}
                                     <h3 className="font-medium ml-2">{escalation.id}</h3>
                                   </div>
                                   {getStatusBadge(escalation.status)}
-                                  <Badge variant="outline">{getAlertTypeLabel(escalation.alertType)}</Badge>
+                                  <Badge variant="outline">{getAlertTypeLabel(escalation.type)}</Badge>
+                                  {escalation.salesforceId && (
+                                    <Badge variant="outline" className="bg-green-100 text-green-800">
+                                      SF
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  Room {escalation.roomId} | {formatDate(escalation.timestamp)}
+                                  {escalation.location} | {formatDate(escalation.timestamp)}
                                 </div>
                               </div>
 
                               <div className="mb-4">
-                                <p className="text-sm font-medium">Owner's Note:</p>
-                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.ownerNote}</p>
+                                <p className="text-sm font-medium">Description:</p>
+                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.description}</p>
                               </div>
 
-                              <div className="mb-4">
-                                <p className="text-sm font-medium">Your Response:</p>
-                                <p className="text-sm bg-muted p-2 rounded-md">{escalation.response}</p>
-                              </div>
+                              {escalation.receptionistComment && (
+                                <div className="mb-4">
+                                  <p className="text-sm font-medium">Your Response:</p>
+                                  <p className="text-sm bg-muted p-2 rounded-md">{escalation.receptionistComment}</p>
+                                </div>
+                              )}
 
                               <div className="flex flex-wrap gap-2">
                                 <Button variant="outline" disabled>
@@ -639,7 +623,6 @@ export default function EscalationsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-      <Toaster />
     </div>
   )
 }

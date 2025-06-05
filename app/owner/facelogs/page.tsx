@@ -7,18 +7,37 @@ import { FaceLogList } from "@/components/face-log-list"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Download, RefreshCw, Users, AlertTriangle, Eye, Clock } from "lucide-react"
+import { useData } from "@/contexts/data-context"
 
 export default function OwnerFaceLogsPage() {
+  const { faceLogs, isLoading } = useData()
   const [filterDate, setFilterDate] = useState<Date | null>(null)
   const [filterCamera, setFilterCamera] = useState<string | null>(null)
   const [filterConfidence, setFilterConfidence] = useState<number | null>(null)
   const [filterType, setFilterType] = useState<string | null>(null)
+
+  // Calculate metrics from actual data
+  const totalDetections = faceLogs.length
+  const unknownFaces = faceLogs.filter((log) => log.matchType === "Unknown").length
+  const registeredGuests = faceLogs.filter((log) => log.matchType === "Guest").length
+  const staffDetections = faceLogs.filter((log) => log.matchType === "Staff").length
 
   const handleResetFilters = () => {
     setFilterDate(null)
     setFilterCamera(null)
     setFilterConfidence(null)
     setFilterType(null)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[500px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading face detection logs...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -45,8 +64,10 @@ export default function OwnerFaceLogsPage() {
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,247</div>
-            <p className="text-xs text-muted-foreground">+12% from yesterday</p>
+            <div className="text-2xl font-bold">{totalDetections}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalDetections === 0 ? "No detections yet" : "Face detections recorded"}
+            </p>
           </CardContent>
         </Card>
 
@@ -56,8 +77,10 @@ export default function OwnerFaceLogsPage() {
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">23</div>
-            <p className="text-xs text-muted-foreground">Requires investigation</p>
+            <div className="text-2xl font-bold">{unknownFaces}</div>
+            <p className="text-xs text-muted-foreground">
+              {unknownFaces === 0 ? "No unknown faces" : "Requires investigation"}
+            </p>
           </CardContent>
         </Card>
 
@@ -67,8 +90,10 @@ export default function OwnerFaceLogsPage() {
             <Users className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,156</div>
-            <p className="text-xs text-muted-foreground">92.7% recognition rate</p>
+            <div className="text-2xl font-bold">{registeredGuests}</div>
+            <p className="text-xs text-muted-foreground">
+              {registeredGuests === 0 ? "No guest detections" : "Guest detections"}
+            </p>
           </CardContent>
         </Card>
 
@@ -78,46 +103,60 @@ export default function OwnerFaceLogsPage() {
             <Clock className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">68</div>
-            <p className="text-xs text-muted-foreground">All authorized</p>
+            <div className="text-2xl font-bold">{staffDetections}</div>
+            <p className="text-xs text-muted-foreground">
+              {staffDetections === 0 ? "No staff detections" : "All authorized"}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Alert Summary */}
-      <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-600" />
-            <CardTitle className="text-amber-800 dark:text-amber-200">Detection Alerts</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
-              <div>
-                <p className="text-sm font-medium">High Confidence Unknown</p>
-                <p className="text-xs text-muted-foreground">Faces detected with &gt;90% confidence</p>
-              </div>
-              <Badge variant="destructive">8</Badge>
+      {unknownFaces > 0 && (
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <CardTitle className="text-amber-800 dark:text-amber-200">Detection Alerts</CardTitle>
             </div>
-            <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
-              <div>
-                <p className="text-sm font-medium">Wrong Room Access</p>
-                <p className="text-xs text-muted-foreground">Guests in unauthorized areas</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">High Confidence Unknown</p>
+                  <p className="text-xs text-muted-foreground">Faces detected with &gt;90% confidence</p>
+                </div>
+                <Badge variant="destructive">
+                  {faceLogs.filter((log) => log.matchType === "Unknown" && log.confidence > 90).length}
+                </Badge>
               </div>
-              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">5</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
-              <div>
-                <p className="text-sm font-medium">After Hours Activity</p>
-                <p className="text-xs text-muted-foreground">Detections outside normal hours</p>
+              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Wrong Room Access</p>
+                  <p className="text-xs text-muted-foreground">Guests in unauthorized areas</p>
+                </div>
+                <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">
+                  {faceLogs.filter((log) => log.matchType === "Guest" && log.unauthorized).length}
+                </Badge>
               </div>
-              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">10</Badge>
+              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">After Hours Activity</p>
+                  <p className="text-xs text-muted-foreground">Detections outside normal hours</p>
+                </div>
+                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                  {
+                    faceLogs.filter((log) => {
+                      const hour = log.timestamp.getHours()
+                      return hour < 6 || hour > 22
+                    }).length
+                  }
+                </Badge>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
